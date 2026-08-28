@@ -73,6 +73,23 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async ValueTask<LedgerEntry?> ReadByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
+        options.InputLimits.ValidateIdempotencyKey(idempotencyKey);
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await ReadByIdempotencyKeyCoreAsync(
+            connection,
+            transaction: null,
+            idempotencyKey,
+            cancellationToken).ConfigureAwait(false);
+    }
+
     private async ValueTask<LedgerEntry> AppendAsync(
         string streamId,
         string eventType,
@@ -91,7 +108,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
 
         if (idempotencyKey is not null)
         {
-            var existing = await ReadByIdempotencyKeyAsync(
+            var existing = await ReadByIdempotencyKeyCoreAsync(
                 connection,
                 transaction,
                 idempotencyKey,
@@ -112,7 +129,8 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             SqliteAppendFaultPoint.AfterHeadRead,
             cancellationToken).ConfigureAwait(false);
         var nextSequence = sequence + 1;
-        var committedAt = timeProvider.GetUtcNow();
+        var committedAt = DateTimeOffset.FromUnixTimeMilliseconds(
+            timeProvider.GetUtcNow().ToUnixTimeMilliseconds());
         var definitivePayload = payload with { Bytes = payload.Bytes.ToArray() };
         var hash = LedgerFormatV1.ComputeHash(
             ledgerId,
@@ -662,9 +680,9 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             : (0, LedgerFormatV1.GenesisHash);
     }
 
-    private static async Task<LedgerEntry?> ReadByIdempotencyKeyAsync(
+    private static async Task<LedgerEntry?> ReadByIdempotencyKeyCoreAsync(
         SqliteConnection connection,
-        SqliteTransaction transaction,
+        SqliteTransaction? transaction,
         string idempotencyKey,
         CancellationToken cancellationToken)
     {
@@ -760,6 +778,11 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
     /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
+        if (options.Pooling)
+        {
+            using var connection = CreateConnection();
+            SqliteConnection.ClearPool(connection);
+        }
         initializationGate.Dispose();
         return ValueTask.CompletedTask;
     }

@@ -27,10 +27,11 @@ jobs:
       - name: Pack
         shell: bash
         run: |
-          args=()
+          version=$(dotnet msbuild src/Penghou.Siming/Penghou.Siming.csproj -getProperty:Version -nologo)
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            args+=(--property:PackageVersion="${GITHUB_REF_NAME#v}")
+            version="${GITHUB_REF_NAME#v}"
           fi
+          echo "PACKAGE_VERSION=$version" >> "$GITHUB_ENV"
           for csproj in \
             src/Penghou.Siming/Penghou.Siming.csproj \
             src/Penghou.Siming.Sqlite/Penghou.Siming.Sqlite.csproj \
@@ -40,8 +41,12 @@ jobs:
             dotnet pack "$csproj" \
               --configuration Release \
               --output ./artifacts \
-              "${args[@]}"
+              --property:PackageVersion="$version"
           done
+
+      - name: Restore and audit packed consumer
+        shell: pwsh
+        run: ./tools/verify_packed_consumer.ps1 -PackageDirectory artifacts -Version $env:PACKAGE_VERSION
 
       - name: NuGet login (OIDC -> temp API key)
         id: login

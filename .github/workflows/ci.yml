@@ -38,7 +38,11 @@ jobs:
         run: python tools/verify_golden_vectors.py
 
       - name: Validate packages
-        run: dotnet pack Penghou.Siming.slnx --configuration Release --no-build --output artifacts
+        run: dotnet pack Penghou.Siming.slnx --configuration Release --no-build --output artifacts --property:PackageVersion=0.0.0-ci.${{ github.run_id }}
+
+      - name: Restore and audit packed consumer
+        shell: pwsh
+        run: ./tools/verify_packed_consumer.ps1 -PackageDirectory artifacts -Version 0.0.0-ci.${{ github.run_id }}
 
       - name: Upload packages
         uses: actions/upload-artifact@v6

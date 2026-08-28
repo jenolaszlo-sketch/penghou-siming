@@ -42,6 +42,9 @@ public sealed record LedgerInputLimits
         if (idempotencyKey is not null) CheckUtf8("idempotencyKey", idempotencyKey, MaxIdempotencyKeyUtf8Bytes);
     }
 
+    internal void ValidateIdempotencyKey(string idempotencyKey) =>
+        CheckUtf8("idempotencyKey", idempotencyKey, MaxIdempotencyKeyUtf8Bytes);
+
     private static void Positive(int value, string name)
     {
         if (value <= 0) throw new ArgumentOutOfRangeException(name, value, "Input limits must be positive.");

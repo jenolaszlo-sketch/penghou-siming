@@ -5,6 +5,8 @@ public interface IAppendOnlyLedger
 {
     /// <summary>Atomically appends definitive payload bytes.</summary>
     ValueTask<LedgerEntry> AppendAsync(LedgerAppendRequest request, CancellationToken cancellationToken = default);
+    /// <summary>Finds an entry by its ledger-wide idempotency key.</summary>
+    ValueTask<LedgerEntry?> ReadByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default);
     /// <summary>Reads all entries, optionally restricted to a logical stream.</summary>
     IAsyncEnumerable<LedgerEntry> ReadAsync(string? streamId = null, CancellationToken cancellationToken = default);
     /// <summary>Reads one ordered page of entries.</summary>

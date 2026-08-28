@@ -47,7 +47,8 @@ be finalized before the first preview release.
 - A global sequence and hash chain are authoritative. Streams are logical query
   partitions and do not form independently verifiable chains in v1.
 - Optional idempotency keys are globally unique per ledger, cryptographically
-  committed, and atomically deduplicated by every conforming provider.
+  committed, atomically deduplicated, and directly queryable by every conforming
+  provider.
 - Sensitive payload retention is a caller policy. Applications should prefer
   bounded provenance and content identities over raw secrets or model payloads.
 - Append inputs are bounded before persistence. Defaults are conservative and
@@ -126,18 +127,19 @@ behavioral conformance suite.
 ## Build and publish
 
 CI builds, checks formatting, runs all .NET tests, independently reproduces the
-v1 golden vector in Python, validates all packages, and uploads the resulting
-`.nupkg` and `.snupkg` files.
+v1 golden vector in Python, then restores, builds, and vulnerability-audits an
+isolated consumer from the packed artifacts before uploading `.nupkg` and
+`.snupkg` files.
 
 Publishing follows the Baize workflow. Configure NuGet trusted publishing for
 this GitHub repository and workflow, then add the NuGet account name as the
 `NUGET_USER` repository secret. Either dispatch **Publish to NuGet** manually or
-push a version tag; a tag such as `v0.1.0-preview.1` becomes package version
-`0.1.0-preview.1`.
+push a version tag; a tag such as `v0.1.0-preview.2` becomes package version
+`0.1.0-preview.2`.
 
 ```powershell
-git tag v0.1.0-preview.1
-git push origin v0.1.0-preview.1
+git tag v0.1.0-preview.2
+git push origin v0.1.0-preview.2
 ```
 
 The API remains pre-release and may change before the first package release.

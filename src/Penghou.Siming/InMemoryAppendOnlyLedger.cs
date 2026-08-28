@@ -39,6 +39,18 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
         return AppendSerializedAsync(request.StreamId, request.EventType, new SerializedLedgerPayload(request.Payload, request.ContentType, request.SerializationFormat, request.SerializationVersion), request.IdempotencyKey, cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async ValueTask<LedgerEntry?> ReadByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
+        inputLimits.ValidateIdempotencyKey(idempotencyKey);
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try { return idempotentEntries.GetValueOrDefault(idempotencyKey); }
+        finally { gate.Release(); }
+    }
+
     private async ValueTask<LedgerEntry> AppendSerializedAsync(string streamId, string eventType, SerializedLedgerPayload payload, string? idempotencyKey, CancellationToken cancellationToken)
     {
         inputLimits.ValidateAppend(streamId, eventType, payload, idempotencyKey);
@@ -53,7 +65,8 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
             }
             var sequence = entries.Count + 1L;
             var previous = entries.Count == 0 ? LedgerFormatV1.GenesisHash : entries[^1].Hash;
-            var committedAt = timeProvider.GetUtcNow();
+            var committedAt = DateTimeOffset.FromUnixTimeMilliseconds(
+                timeProvider.GetUtcNow().ToUnixTimeMilliseconds());
             var definitivePayload = payload with { Bytes = payload.Bytes.ToArray() };
             var hash = LedgerFormatV1.ComputeHash(LedgerId, sequence, committedAt, streamId, eventType, definitivePayload, idempotencyKey, previous);
             var entry = new LedgerEntry(sequence, streamId, committedAt, eventType, definitivePayload.ContentType, definitivePayload.SerializationFormat, definitivePayload.SerializationVersion, definitivePayload.Bytes, idempotencyKey, previous, hash, LedgerFormatV1.Version);

@@ -49,6 +49,13 @@ public static class LedgerProviderConformance
                     IdempotencyKey: "conformance:first"),
                 cancellationToken).ConfigureAwait(false);
             Require(replay.Sequence == first.Sequence && replay.Hash == first.Hash, "idempotent replay");
+            var found = await ledger.ReadByIdempotencyKeyAsync(
+                "conformance:first",
+                cancellationToken).ConfigureAwait(false);
+            Require(found?.Sequence == first.Sequence && found.Hash == first.Hash, "idempotency lookup");
+            Require(await ledger.ReadByIdempotencyKeyAsync(
+                "conformance:missing",
+                cancellationToken).ConfigureAwait(false) is null, "missing idempotency lookup");
             try
             {
                 await ledger.AppendAsync(

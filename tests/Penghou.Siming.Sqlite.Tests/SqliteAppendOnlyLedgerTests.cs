@@ -52,6 +52,64 @@ public sealed class SqliteAppendOnlyLedgerTests : IDisposable
     }
 
     [Fact]
+    public async Task IdempotencyLookup_PersistsAcrossReopen()
+    {
+        Directory.CreateDirectory(root);
+        var request = new LedgerAppendRequest(
+            "s", "e", "data"u8.ToArray(), IdempotencyKey: "session:event-1");
+        LedgerEntry committed;
+        await using (var writer = Create("lookup.db"))
+            committed = await writer.AppendAsync(request);
+
+        await using var reader = Create("lookup.db");
+        var found = await reader.ReadByIdempotencyKeyAsync("session:event-1");
+
+        Assert.NotNull(found);
+        Assert.Equal(committed.Sequence, found.Sequence);
+        Assert.Equal(committed.CommittedAt, found.CommittedAt);
+        Assert.Equal(committed.Hash, found.Hash);
+        Assert.Null(await reader.ReadByIdempotencyKeyAsync("session:missing"));
+    }
+
+    [Fact]
+    public async Task Dispose_ReleasesPooledFilesForArchival()
+    {
+        Directory.CreateDirectory(root);
+        var database = Path.Combine(root, "pooled.db");
+        var archived = Path.Combine(root, "archived.db");
+        var ledger = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            new SimingSqliteOptions { DatabasePath = database, Pooling = true }, new());
+        await ledger.AppendAsync(new LedgerAppendRequest("s", "e", Array.Empty<byte>()));
+
+        await ledger.DisposeAsync();
+        File.Move(database, archived);
+
+        Assert.True(File.Exists(archived));
+    }
+
+    [Fact]
+    public async Task ManyIndependentLedgerFiles_KeepIdentityAndHeadsIsolated()
+    {
+        Directory.CreateDirectory(root);
+        var identities = new HashSet<LedgerId>();
+        for (var index = 0; index < 24; index++)
+        {
+            await using var ledger = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+                new SimingSqliteOptions
+                {
+                    DatabasePath = Path.Combine(root, $"session-{index}.db"),
+                    Pooling = true
+                }, new());
+            await ledger.AppendAsync(new LedgerAppendRequest(
+                $"session-{index}", "started", BitConverter.GetBytes(index)));
+            var head = await ledger.GetHeadAsync();
+            Assert.Equal(1, head.Sequence);
+            Assert.True(identities.Add(head.LedgerId));
+        }
+        Assert.Equal(24, identities.Count);
+    }
+
+    [Fact]
     public async Task Triggers_RejectUpdateAndDelete()
     {
         Directory.CreateDirectory(root);

@@ -195,6 +195,8 @@ the original CLR types.
 - Repeating the same key with identical stream, event type, serializer
   descriptors, and definitive payload bytes returns the original committed
   entry without advancing the sequence.
+- Providers expose direct lookup by idempotency key so callers can recover the
+  original definitive envelope before constructing a retry.
 - Reusing the key with different committed content throws
   `LedgerIdempotencyConflictException`.
 - Providers enforce lookup and append atomically. SQLite uses its immediate
@@ -283,15 +285,15 @@ Guyabano code.
 
 ## Guyabano dogfooding and reduction
 
-Create `Guyabano.Session.Sqlite` as the domain adapter.
+Create `Guyabano.Session.Sqlite` as the domain adapter. Guyabano will use one
+independent Siming ledger file per session; a separate rebuildable catalog may
+support discovery and current-state queries without becoming authoritative.
 
 - [ ] map Guyabano `SessionEvent` to Siming streams and payloads;
 - [ ] preserve event IDs, explicit sequence semantics where needed,
   idempotency keys, causation, correlation and cross-system references;
-- [ ] import JSONL history into a new ledger without pretending the imported
-  rows were originally committed by Siming;
-- [ ] append a migration/import provenance event and retain source identity;
-- [ ] replace the filesystem session event store;
+- [ ] replace and remove the unused filesystem session event store; no legacy
+  migration is required before Guyabano has users;
 - [ ] create rebuildable SQLite projections for timeline, pending input,
   current workspace, approval, and reconciliation state;
 - [ ] prove projection rebuild, crash recovery, retry and pagination;
@@ -390,12 +392,17 @@ measurements demonstrate a real need.
   recovery, true multi-process contention, deterministic busy-timeout behavior,
   strict read-only operation, stable verification snapshots, and schema-object
   compatibility coverage.
-- The full suite passes 48 tests (26 core and 22 SQLite), and the independent
+- The full suite passes 51 tests (26 core and 25 SQLite), and the independent
   Python verifier reproduces the v1 golden hash.
 - Canonical JSON is cross-checked against portable Guyabano `v2` compatibility
   vectors, including exponent, negative-zero, escaping, and property ordering.
 - Provider-neutral append limits cover payload and UTF-8 metadata sizes before
   mutation; custom limits are tested in both in-memory and SQLite providers.
+- Direct idempotency lookup is provider-neutral and covered by conformance and
+  reopen tests. SQLite disposal drains its matching pool so independent ledger
+  files can be moved or archived, and multi-ledger isolation is tested.
+- SQLite uses Microsoft.Data.Sqlite 10.0.11, and CI restores and audits an
+  isolated project from uniquely versioned packed artifacts.
 - Portable and signed checkpoints, bounded verification, progress,
   cancellation, and the operational verifier CLI are implemented.
 - The repository is committed and connected to its GitHub remote.
