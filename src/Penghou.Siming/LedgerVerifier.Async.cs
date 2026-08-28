@@ -2,6 +2,7 @@ namespace Penghou.Siming;
 
 public static partial class LedgerVerifier
 {
+    /// <summary>Verifies a provider using bounded pages, progress, and cancellation.</summary>
     public static async ValueTask<LedgerVerificationResult> VerifyAsync(
         IAppendOnlyLedger ledger,
         LedgerCheckpoint? checkpoint = null,
@@ -14,6 +15,24 @@ public static partial class LedgerVerifier
         cancellationToken.ThrowIfCancellationRequested();
 
         var target = await ledger.GetHeadAsync(cancellationToken).ConfigureAwait(false);
+        return await VerifySnapshotAsync(
+            target,
+            (request, token) => ledger.ReadAsync(request, token),
+            checkpoint,
+            options,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static async ValueTask<LedgerVerificationResult> VerifySnapshotAsync(
+        LedgerHead target,
+        Func<LedgerReadRequest, CancellationToken, IAsyncEnumerable<LedgerEntry>> read,
+        LedgerCheckpoint? checkpoint,
+        LedgerVerificationOptions options,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(read);
+        options.Validate();
+        cancellationToken.ThrowIfCancellationRequested();
         if (checkpoint is not null && checkpoint.LedgerId != target.LedgerId)
             return new(false, 0,
                 new LedgerHead(target.LedgerId, 0, LedgerFormatV1.GenesisHash,
@@ -26,8 +45,17 @@ public static partial class LedgerVerifier
                     LedgerFormatV1.Version),
                 checkpoint.Sequence, LedgerVerificationFailure.UnsupportedVersion,
                 "The checkpoint format version is unsupported.");
+        if (checkpoint is not null && checkpoint.Sequence > target.Sequence)
+            return new(false, 0,
+                new LedgerHead(target.LedgerId, 0, LedgerFormatV1.GenesisHash,
+                    LedgerFormatV1.Version),
+                checkpoint.Sequence, LedgerVerificationFailure.CheckpointSequenceMismatch,
+                "The ledger does not extend to the checkpoint sequence.");
         var verifiedEntries = new List<LedgerEntry>(options.PageSize);
         var previous = LedgerFormatV1.GenesisHash;
+        LedgerHash? checkpointHash = checkpoint?.Sequence == 0
+            ? LedgerFormatV1.GenesisHash
+            : null;
         long verified = 0;
         options.Progress?.Report(new(verified, target.Sequence, previous));
 
@@ -36,7 +64,7 @@ public static partial class LedgerVerifier
             cancellationToken.ThrowIfCancellationRequested();
             var limit = (int)Math.Min(options.PageSize, target.Sequence - verified);
             verifiedEntries.Clear();
-            await foreach (var entry in ledger.ReadAsync(
+            await foreach (var entry in read(
                                new LedgerReadRequest(AfterSequence: verified, Limit: limit),
                                cancellationToken).ConfigureAwait(false))
                 verifiedEntries.Add(entry);
@@ -59,25 +87,14 @@ public static partial class LedgerVerifier
                         entry.Sequence, failure.Value.Failure, failure.Value.Detail);
                 previous = entry.Hash;
                 verified++;
+                if (checkpoint?.Sequence == entry.Sequence)
+                    checkpointHash = entry.Hash;
             }
             options.Progress?.Report(new(verified, target.Sequence, previous));
         }
 
-        // Reuse the established checkpoint semantics over bounded reads by
-        // reading only the anchored entry when it is not the current head.
-        LedgerHash? checkpointHash = null;
         if (checkpoint is not null)
         {
-            if (checkpoint.Sequence == 0)
-                checkpointHash = LedgerFormatV1.GenesisHash;
-            else if (checkpoint.Sequence <= target.Sequence)
-            {
-                await foreach (var entry in ledger.ReadAsync(
-                                   new LedgerReadRequest(
-                                       AfterSequence: checkpoint.Sequence - 1,
-                                       Limit: 1), cancellationToken).ConfigureAwait(false))
-                    checkpointHash = entry.Hash;
-            }
             if (checkpointHash is null)
                 return new(false, verified,
                     new LedgerHead(target.LedgerId, verified, previous, LedgerFormatV1.Version),

@@ -1,7 +1,9 @@
 namespace Penghou.Siming;
 
+/// <summary>Verifies ledger hash-chain and checkpoint integrity.</summary>
 public static partial class LedgerVerifier
 {
+    /// <summary>Verifies an in-memory complete ledger representation.</summary>
     public static LedgerVerificationResult Verify(LedgerId ledgerId, IReadOnlyList<LedgerEntry> entries, LedgerCheckpoint? checkpoint = null)
     {
         if (checkpoint is not null && checkpoint.LedgerId != ledgerId)

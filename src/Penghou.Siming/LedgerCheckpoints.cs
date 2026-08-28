@@ -2,8 +2,10 @@ using System.Text.Json;
 
 namespace Penghou.Siming;
 
+/// <summary>Captures and serializes portable versioned ledger checkpoints.</summary>
 public static class LedgerCheckpoints
 {
+    /// <summary>Captures the ledger's current head as a checkpoint.</summary>
     public static async ValueTask<LedgerCheckpoint> CaptureAsync(
         IAppendOnlyLedger ledger,
         TimeProvider? timeProvider = null,
@@ -20,6 +22,7 @@ public static class LedgerCheckpoints
             head.FormatVersion);
     }
 
+    /// <summary>Exports a deterministic portable checkpoint document.</summary>
     public static byte[] Export(LedgerCheckpoint checkpoint)
     {
         Validate(checkpoint);
@@ -39,6 +42,7 @@ public static class LedgerCheckpoints
         return buffer.ToArray();
     }
 
+    /// <summary>Imports and validates a portable checkpoint document.</summary>
     public static LedgerCheckpoint Import(ReadOnlySpan<byte> utf8Json)
     {
         try

@@ -2,8 +2,12 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Penghou.Siming</PackageId>
+    <Title>Penghou Siming</Title>
+    <Description>Provider-neutral tamper-evident append-only event ledger contracts, canonical payloads, verification, and checkpoints.</Description>
+    <PackageTags>ledger;audit;hash-chain;tamper-evident;provenance;events</PackageTags>
   </PropertyGroup>
 
 </Project>

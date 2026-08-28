@@ -240,6 +240,9 @@ public sealed class SqliteAppendOnlyLedgerTests : IDisposable
             command.CommandText = """
                 DROP TRIGGER ledger_metadata_no_update;
                 UPDATE ledger_metadata SET format_version = 99 WHERE singleton_id = 1;
+                CREATE TRIGGER ledger_metadata_no_update
+                BEFORE UPDATE ON ledger_metadata
+                BEGIN SELECT RAISE(ABORT, 'Ledger metadata is immutable'); END;
                 """;
             await command.ExecuteNonQueryAsync();
         }
@@ -249,6 +252,87 @@ public sealed class SqliteAppendOnlyLedgerTests : IDisposable
             () => ledger.GetHeadAsync().AsTask());
 
         Assert.Contains("99", error.Message);
+    }
+
+    [Fact]
+    public async Task ReadOnlyOpen_RejectsIncompleteDatabaseWithoutModifyingIt()
+    {
+        Directory.CreateDirectory(root);
+        var database = Path.Combine(root, "incomplete.db");
+        await using (var connection = new SqliteConnection($"Data Source={database}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE unrelated(value TEXT);";
+            await command.ExecuteNonQueryAsync();
+        }
+        var before = await ReadSchemaSqlAsync(database);
+        await using var ledger = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("incomplete.db") with { OpenMode = SimingSqliteOpenMode.ReadOnly },
+            new());
+
+        await Assert.ThrowsAsync<SimingSchemaCompatibilityException>(
+            () => ledger.GetHeadAsync().AsTask());
+
+        Assert.Equal(before, await ReadSchemaSqlAsync(database));
+    }
+
+    [Fact]
+    public async Task ReadOnlySnapshot_RemainsStableWhileWriterAppends()
+    {
+        Directory.CreateDirectory(root);
+        await using var writer = Create("snapshot.db");
+        await writer.AppendAsync(new LedgerAppendRequest("s", "one", new byte[] { 1 }));
+        await writer.AppendAsync(new LedgerAppendRequest("s", "two", new byte[] { 2 }));
+        await using var reader = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("snapshot.db") with { OpenMode = SimingSqliteOpenMode.ReadOnly },
+            new());
+        Task<LedgerEntry>? appendTask = null;
+        var progress = new CallbackProgress(value =>
+        {
+            if (value.VerifiedEntries != 1 || appendTask is not null)
+                return;
+            appendTask = writer.AppendAsync(
+                new LedgerAppendRequest("s", "three", new byte[] { 3 })).AsTask();
+        });
+
+        var result = await reader.VerifyAsync(
+            null, new LedgerVerificationOptions(1, progress));
+
+        Assert.True(result.IsValid);
+        Assert.Equal(2, result.VerifiedEntries);
+        Assert.NotNull(appendTask);
+        await appendTask;
+        Assert.Equal(3, (await writer.GetHeadAsync()).Sequence);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            reader.AppendAsync(new LedgerAppendRequest("s", "denied", new byte[] { 4 }))
+                .AsTask());
+    }
+
+    [Fact]
+    public async Task ReplacedAppendOnlyTrigger_IsRejectedAsIncompatible()
+    {
+        Directory.CreateDirectory(root);
+        var database = Path.Combine(root, "bad-trigger.db");
+        await using (var initialized = Create("bad-trigger.db"))
+            await initialized.GetHeadAsync();
+        await using (var connection = new SqliteConnection($"Data Source={database}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                DROP TRIGGER ledger_entries_no_update;
+                CREATE TRIGGER ledger_entries_no_update
+                BEFORE UPDATE ON ledger_entries BEGIN SELECT 1; END;
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+        await using var ledger = Create("bad-trigger.db");
+
+        var error = await Assert.ThrowsAsync<SimingSchemaCompatibilityException>(
+            () => ledger.GetHeadAsync().AsTask());
+
+        Assert.Contains("ledger_entries_no_update", error.Message);
     }
 
     [Fact]
@@ -308,10 +392,10 @@ public sealed class SqliteAppendOnlyLedgerTests : IDisposable
         string fileName) => new(Options(fileName), new CanonicalJsonPayloadSerializer());
 
     private SimingSqliteOptions Options(string fileName) => new()
-        {
-            DatabasePath = Path.Combine(root, fileName),
-            Pooling = false
-        };
+    {
+        DatabasePath = Path.Combine(root, fileName),
+        Pooling = false
+    };
 
     private static Process StartChild(params string[] arguments)
     {
@@ -333,6 +417,26 @@ public sealed class SqliteAppendOnlyLedgerTests : IDisposable
     {
         var error = await process.StandardError.ReadToEndAsync();
         Assert.True(process.ExitCode == 0, $"Child exited {process.ExitCode}: {error}");
+    }
+
+    private static async Task<string[]> ReadSchemaSqlAsync(string database)
+    {
+        await using var connection = new SqliteConnection($"Data Source={database}");
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT coalesce(sql, '') FROM sqlite_master ORDER BY type, name;";
+        var result = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            result.Add(reader.GetString(0));
+        return result.ToArray();
+    }
+
+    private sealed class CallbackProgress(Action<LedgerVerificationProgress> callback) :
+        IProgress<LedgerVerificationProgress>
+    {
+        public void Report(LedgerVerificationProgress value) => callback(value);
     }
 
     public void Dispose()

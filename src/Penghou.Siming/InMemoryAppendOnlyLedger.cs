@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 
 namespace Penghou.Siming;
 
+/// <summary>In-memory ledger provider intended for testing and ephemeral use.</summary>
 public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TSerializer>, IAsyncDisposable where TSerializer : ILedgerPayloadSerializer
 {
     private readonly SemaphoreSlim gate = new(1, 1);
@@ -10,6 +11,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
     private readonly TSerializer serializer;
     private readonly TimeProvider timeProvider;
 
+    /// <summary>Creates an in-memory ledger.</summary>
     public InMemoryAppendOnlyLedger(TSerializer serializer, TimeProvider? timeProvider = null, LedgerId? ledgerId = null)
     {
         this.serializer = serializer;
@@ -17,14 +19,17 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
         LedgerId = ledgerId ?? Penghou.Siming.LedgerId.New();
     }
 
+    /// <summary>Gets this ledger's immutable identity.</summary>
     public LedgerId LedgerId { get; }
 
+    /// <inheritdoc />
     public ValueTask<LedgerEntry> AppendAsync<T>(LedgerAppendRequest<T> request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         return AppendSerializedAsync(request.StreamId, request.EventType, serializer.Serialize(request.Payload), request.IdempotencyKey, cancellationToken);
     }
 
+    /// <inheritdoc />
     public ValueTask<LedgerEntry> AppendAsync(LedgerAppendRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -55,6 +60,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
         finally { gate.Release(); }
     }
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<LedgerEntry> ReadAsync(string? streamId = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         LedgerEntry[] snapshot;
@@ -64,6 +70,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
         foreach (var entry in snapshot) { cancellationToken.ThrowIfCancellationRequested(); yield return entry; }
     }
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<LedgerEntry> ReadAsync(LedgerReadRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -82,6 +89,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
         foreach (var entry in snapshot) { cancellationToken.ThrowIfCancellationRequested(); yield return entry; }
     }
 
+    /// <inheritdoc />
     public async ValueTask<LedgerHead> GetHeadAsync(CancellationToken cancellationToken = default)
     {
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -89,12 +97,14 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
         finally { gate.Release(); }
     }
 
+    /// <inheritdoc />
     public async ValueTask<LedgerVerificationResult> VerifyAsync(LedgerCheckpoint? checkpoint = null, CancellationToken cancellationToken = default)
     {
         return await LedgerVerifier.VerifyAsync(
             this, checkpoint, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
     public ValueTask DisposeAsync() { gate.Dispose(); return ValueTask.CompletedTask; }
 
     private static bool Matches(LedgerEntry entry, string streamId, string eventType, SerializedLedgerPayload payload) =>

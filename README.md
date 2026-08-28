@@ -85,9 +85,38 @@ dotnet run --project src/Penghou.Siming.Verify -- ledger.db --checkpoint checkpo
 The CLI also accepts `--signed-checkpoint`, `--public-key`, and `--key-id`.
 It prints one JSON result to standard output, progress to standard error, and
 returns `0` for valid, `1` for verification failure, `2` for invalid input, or
-`130` for cancellation. It refuses a missing database. Until the roadmap's
-strict read-only provider path is implemented, run it on a copy: opening an
-existing incomplete database can invoke normal SQLite initialization.
+`130` for cancellation. It opens the database through a strict read-only path,
+performs no initialization or schema mutation, and verifies one stable SQLite
+read snapshot while writers may continue under WAL.
+
+## Install
+
+```powershell
+dotnet add package Penghou.Siming --prerelease
+dotnet add package Penghou.Siming.Sqlite --prerelease
+dotnet tool install --global Penghou.Siming.Verify --prerelease
+```
+
+Add `Penghou.Siming.Cryptography` only when detached Ed25519 checkpoint signing
+is required. Provider authors can use `Penghou.Siming.Testing` to run the shared
+behavioral conformance suite.
+
+## Build and publish
+
+CI builds, checks formatting, runs all .NET tests, independently reproduces the
+v1 golden vector in Python, validates all packages, and uploads the resulting
+`.nupkg` and `.snupkg` files.
+
+Publishing follows the Baize workflow. Configure NuGet trusted publishing for
+this GitHub repository and workflow, then add the NuGet account name as the
+`NUGET_USER` repository secret. Either dispatch **Publish to NuGet** manually or
+push a version tag; a tag such as `v0.1.0-preview.1` becomes package version
+`0.1.0-preview.1`.
+
+```powershell
+git tag v0.1.0-preview.1
+git push origin v0.1.0-preview.1
+```
 
 The API remains pre-release and may change before the first package release.
 

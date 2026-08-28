@@ -9,8 +9,14 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>penghou-siming-verify</ToolCommandName>
+    <PackageId>Penghou.Siming.Verify</PackageId>
+    <Title>Penghou Siming Verifier</Title>
+    <Description>Command-line verification for Penghou.Siming SQLite ledgers and signed or unsigned checkpoints.</Description>
+    <PackageTags>dotnet-tool;ledger;verification;sqlite;audit;ed25519</PackageTags>
   </PropertyGroup>
 
 </Project>

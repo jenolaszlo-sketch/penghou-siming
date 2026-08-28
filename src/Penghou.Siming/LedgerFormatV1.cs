@@ -5,11 +5,15 @@ using System.Text;
 
 namespace Penghou.Siming;
 
+/// <summary>Defines the independently reproducible Penghou.Siming hash format v1.</summary>
 public static class LedgerFormatV1
 {
+    /// <summary>Version committed into every v1 row.</summary>
     public const int Version = 1;
+    /// <summary>Deterministic hash preceding the first row.</summary>
     public static LedgerHash GenesisHash { get; } = new(SHA256.HashData(Encoding.UTF8.GetBytes("penghou-siming-ledger-v1")));
 
+    /// <summary>Computes a v1 row hash from all committed envelope fields.</summary>
     public static LedgerHash ComputeHash(LedgerId ledgerId, long sequence, DateTimeOffset committedAt, string streamId, string eventType, SerializedLedgerPayload payload, string? idempotencyKey, LedgerHash previousHash)
     {
         if (sequence <= 0) throw new ArgumentOutOfRangeException(nameof(sequence));

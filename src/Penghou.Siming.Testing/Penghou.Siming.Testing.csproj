@@ -6,8 +6,12 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Penghou.Siming.Testing</PackageId>
+    <Title>Penghou Siming Testing</Title>
+    <Description>Reusable provider conformance checks for Penghou.Siming ledger implementations.</Description>
+    <PackageTags>testing;conformance;ledger;providers;audit</PackageTags>
   </PropertyGroup>
 
 </Project>

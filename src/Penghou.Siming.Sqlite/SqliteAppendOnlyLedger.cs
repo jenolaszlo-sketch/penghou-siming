@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Penghou.Siming.Sqlite;
 
+/// <summary>Transactional SQLite implementation of the Siming append-only ledger.</summary>
 public sealed class SqliteAppendOnlyLedger<TSerializer> :
     IAppendOnlyLedger<TSerializer>,
     IAsyncDisposable
@@ -17,6 +18,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
     private bool initialized;
     private LedgerId ledgerId;
 
+    /// <summary>Creates a SQLite ledger provider with explicit serializer and access options.</summary>
     public SqliteAppendOnlyLedger(
         SimingSqliteOptions options,
         TSerializer serializer,
@@ -37,6 +39,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         : this(options, serializer, timeProvider) =>
         this.appendFault = appendFault;
 
+    /// <inheritdoc />
     public ValueTask<LedgerEntry> AppendAsync<T>(
         LedgerAppendRequest<T> request,
         CancellationToken cancellationToken = default)
@@ -50,6 +53,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             cancellationToken);
     }
 
+    /// <inheritdoc />
     public ValueTask<LedgerEntry> AppendAsync(
         LedgerAppendRequest request,
         CancellationToken cancellationToken = default)
@@ -74,6 +78,9 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         string? idempotencyKey,
         CancellationToken cancellationToken)
     {
+        if (options.OpenMode == SimingSqliteOpenMode.ReadOnly)
+            throw new InvalidOperationException(
+                "Cannot append through a read-only Siming SQLite ledger.");
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -171,6 +178,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             LedgerFormatV1.Version);
     }
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<LedgerEntry> ReadAsync(
         string? streamId = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -194,6 +202,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         }
     }
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<LedgerEntry> ReadAsync(
         LedgerReadRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -233,6 +242,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             yield return ReadEntry(reader);
     }
 
+    /// <inheritdoc />
     public async ValueTask<LedgerHead> GetHeadAsync(
         CancellationToken cancellationToken = default)
     {
@@ -246,12 +256,39 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         return new(ledgerId, sequence, hash, LedgerFormatV1.Version);
     }
 
+    /// <inheritdoc />
     public async ValueTask<LedgerVerificationResult> VerifyAsync(
         LedgerCheckpoint? checkpoint = null,
         CancellationToken cancellationToken = default)
     {
-        return await LedgerVerifier.VerifyAsync(
-            this, checkpoint, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return await VerifyAsync(
+            checkpoint, new LedgerVerificationOptions(), cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>Verifies one stable SQLite read snapshot with bounded progress options.</summary>
+    public async ValueTask<LedgerVerificationResult> VerifyAsync(
+        LedgerCheckpoint? checkpoint,
+        LedgerVerificationOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        using var transaction = connection.BeginTransaction(deferred: true);
+        var (sequence, hash) = await ReadHeadAsync(
+            connection, transaction, cancellationToken).ConfigureAwait(false);
+        var target = new LedgerHead(ledgerId, sequence, hash, LedgerFormatV1.Version);
+        var result = await LedgerVerifier.VerifySnapshotAsync(
+            target,
+            (request, token) => ReadSnapshotAsync(
+                connection, transaction, request, token),
+            checkpoint,
+            options,
+            cancellationToken).ConfigureAwait(false);
+        transaction.Commit();
+        return result;
     }
 
     private async ValueTask EnsureInitializedAsync(
@@ -265,11 +302,19 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             if (initialized)
                 return;
             var fullPath = Path.GetFullPath(options.DatabasePath);
-            Directory.CreateDirectory(
-                Path.GetDirectoryName(fullPath) ??
-                throw new InvalidOperationException("Database path has no directory."));
+            if (options.OpenMode == SimingSqliteOpenMode.ReadWriteCreate)
+                Directory.CreateDirectory(
+                    Path.GetDirectoryName(fullPath) ??
+                    throw new InvalidOperationException("Database path has no directory."));
             await using var connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            if (options.OpenMode == SimingSqliteOpenMode.ReadOnly)
+            {
+                await InitializeReadOnlyAsync(connection, cancellationToken)
+                    .ConfigureAwait(false);
+                initialized = true;
+                return;
+            }
             await using (var pragmas = connection.CreateCommand())
             {
                 pragmas.CommandText = "PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;";
@@ -341,12 +386,71 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         var builder = new SqliteConnectionStringBuilder
         {
             DataSource = Path.GetFullPath(options.DatabasePath),
-            Mode = SqliteOpenMode.ReadWriteCreate,
-            Cache = SqliteCacheMode.Shared,
+            Mode = options.OpenMode == SimingSqliteOpenMode.ReadOnly
+                ? SqliteOpenMode.ReadOnly
+                : SqliteOpenMode.ReadWriteCreate,
+            Cache = options.OpenMode == SimingSqliteOpenMode.ReadOnly
+                ? SqliteCacheMode.Private
+                : SqliteCacheMode.Shared,
             Pooling = options.Pooling,
             DefaultTimeout = Math.Max(1, (int)Math.Ceiling(options.BusyTimeout.TotalSeconds))
         };
         return new SqliteConnection(builder.ConnectionString);
+    }
+
+    private async Task InitializeReadOnlyAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        using var transaction = connection.BeginTransaction(deferred: true);
+        if (!await HasExistingLedgerSchemaAsync(
+                connection, transaction, cancellationToken).ConfigureAwait(false))
+            throw new SimingSchemaCompatibilityException(
+                "The database does not contain a Siming ledger schema.");
+        await ValidateSchemaAsync(
+            connection, transaction, cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            "SELECT ledger_id, format_version FROM ledger_metadata WHERE singleton_id = 1;";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            throw new SimingSchemaCompatibilityException(
+                "The database has no Siming ledger metadata row.");
+        ledgerId = new LedgerId(Guid.Parse(reader.GetString(0)));
+        var version = reader.GetInt32(1);
+        if (version != LedgerFormatV1.Version)
+            throw new SimingSchemaCompatibilityException(
+                $"Ledger format version {version} is unsupported.");
+        await reader.DisposeAsync().ConfigureAwait(false);
+        transaction.Commit();
+    }
+
+    private static async IAsyncEnumerable<LedgerEntry> ReadSnapshotAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        LedgerReadRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        request.Validate();
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT sequence, stream_id, committed_at_unix_ms, event_type,
+                   content_type, serialization_format, serialization_version,
+                   payload, idempotency_key, previous_hash, row_hash, format_version
+            FROM ledger_entries
+            WHERE sequence > $after
+            ORDER BY sequence
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$after", request.AfterSequence);
+        command.Parameters.AddWithValue("$limit", request.Limit);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken)
+            .ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            yield return ReadEntry(reader);
     }
 
     private ValueTask InjectAsync(
@@ -388,7 +492,94 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
                 new("format_version", "INTEGER", true, false)
             ],
             cancellationToken).ConfigureAwait(false);
+        await ValidateSchemaObjectsAsync(
+            connection, transaction, cancellationToken).ConfigureAwait(false);
     }
+
+    private static async Task ValidateSchemaObjectsAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        var required = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["ledger_metadata"] =
+            [
+                "CHECK(singleton_id = 1)"
+            ],
+            ["ledger_entries"] =
+            [
+                "CHECK(sequence > 0)",
+                "CHECK(length(stream_id) > 0)",
+                "CHECK(length(previous_hash) = 32)",
+                "CHECK(length(row_hash) = 32)"
+            ],
+            ["ix_ledger_entries_stream_sequence"] =
+            [
+                "CREATE INDEX",
+                "ON ledger_entries(stream_id, sequence)"
+            ],
+            ["ux_ledger_entries_idempotency_key"] =
+            [
+                "CREATE UNIQUE INDEX",
+                "ON ledger_entries(idempotency_key)",
+                "WHERE idempotency_key IS NOT NULL"
+            ],
+            ["ledger_metadata_no_update"] =
+            [
+                "BEFORE UPDATE ON ledger_metadata",
+                "RAISE(ABORT, 'Ledger metadata is immutable')"
+            ],
+            ["ledger_metadata_no_delete"] =
+            [
+                "BEFORE DELETE ON ledger_metadata",
+                "RAISE(ABORT, 'Ledger metadata is immutable')"
+            ],
+            ["ledger_entries_no_update"] =
+            [
+                "BEFORE UPDATE ON ledger_entries",
+                "RAISE(ABORT, 'Ledger entries are immutable')"
+            ],
+            ["ledger_entries_no_delete"] =
+            [
+                "BEFORE DELETE ON ledger_entries",
+                "RAISE(ABORT, 'Ledger entries are immutable')"
+            ]
+        };
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT name, sql
+            FROM sqlite_master
+            WHERE name IN (
+                'ledger_metadata', 'ledger_entries',
+                'ix_ledger_entries_stream_sequence',
+                'ux_ledger_entries_idempotency_key',
+                'ledger_metadata_no_update', 'ledger_metadata_no_delete',
+                'ledger_entries_no_update', 'ledger_entries_no_delete');
+            """;
+        var actual = new Dictionary<string, string>(StringComparer.Ordinal);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken)
+            .ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            actual[reader.GetString(0)] = reader.IsDBNull(1) ? "" : reader.GetString(1);
+        foreach (var (name, fragments) in required)
+        {
+            if (!actual.TryGetValue(name, out var sql))
+                throw new SimingSchemaCompatibilityException(
+                    $"Required SQLite schema object '{name}' is missing.");
+            var normalized = NormalizeSql(sql);
+            var missing = fragments.FirstOrDefault(fragment =>
+                !normalized.Contains(NormalizeSql(fragment), StringComparison.Ordinal));
+            if (missing is not null)
+                throw new SimingSchemaCompatibilityException(
+                    $"SQLite schema object '{name}' has an incompatible definition.");
+        }
+    }
+
+    private static string NormalizeSql(string value) =>
+        string.Concat(value.Where(character => !char.IsWhiteSpace(character)))
+            .ToUpperInvariant();
 
     private static async Task<bool> HasExistingLedgerSchemaAsync(
         SqliteConnection connection,
@@ -563,6 +754,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         BEGIN SELECT RAISE(ABORT, 'Ledger entries are immutable'); END;
         """;
 
+    /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
         initializationGate.Dispose();

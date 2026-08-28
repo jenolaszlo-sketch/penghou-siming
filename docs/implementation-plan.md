@@ -248,28 +248,22 @@ golden vectors.
 
 ## Immediate implementation sequence
 
-1. Make operational verification strictly non-mutating with an explicit SQLite
-   read-only open mode.
-2. Verify through a stable provider snapshot; SQLite uses one read transaction
-   for metadata, target head, pages, and checkpoint evidence.
-3. Validate trigger, index, predicate, and constraint definitions—not only table
-   columns.
-4. Unify synchronous and paged verification behind one incremental state
+1. Unify synchronous and paged verification behind one incremental state
    machine with precise failure categories.
-5. Bound untrusted input and hash large envelopes incrementally.
-6. Make generated signing keys non-exportable by default and formalize external
+2. Bound untrusted input and hash large envelopes incrementally.
+3. Make generated signing keys non-exportable by default and formalize external
    signer/key-store extension points.
-7. Complete canonical JSON and adversarial-test decisions.
-8. Specify public context binding and optional keyed suites without changing v1.
-9. Complete packaging and operational guidance, then begin Guyabano adoption.
+4. Complete canonical JSON and adversarial-test decisions.
+5. Specify public context binding and optional keyed suites without changing v1.
+6. Establish package compatibility baselines and operational guidance, then
+   begin Guyabano adoption.
 
 ## Package readiness
 
 - [ ] public API baselines and compatibility policy;
-- [ ] XML documentation and examples;
+- [ ] complete API usage examples;
 - [ ] trimming and Native AOT review;
 - [ ] CI for supported .NET targets and operating systems;
-- [ ] package metadata, license, source link, deterministic builds and symbols;
 - [ ] append, pagination and full-verification benchmarks;
 - [ ] threat model, payload retention, backup and checkpoint guidance;
 - [ ] publish preview packages.
@@ -386,8 +380,9 @@ measurements demonstrate a real need.
   concurrency coverage. It also has explicit compatibility errors, injected
   rollback/cancellation tests at each append boundary, killed-process WAL
   recovery, true multi-process contention, deterministic busy-timeout behavior,
-  and declared type/nullability/key schema compatibility coverage.
-- The full suite passes 42 tests (24 core and 18 SQLite), and the independent
+  strict read-only operation, stable verification snapshots, and schema-object
+  compatibility coverage.
+- The full suite passes 45 tests (24 core and 21 SQLite), and the independent
   Python verifier reproduces the v1 golden hash.
 - Portable and signed checkpoints, bounded verification, progress,
   cancellation, and the operational verifier CLI are implemented.

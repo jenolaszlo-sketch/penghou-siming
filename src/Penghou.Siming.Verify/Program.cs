@@ -4,8 +4,10 @@ using Penghou.Siming.Sqlite;
 
 namespace Penghou.Siming.Verify;
 
+/// <summary>Command-line entry point for operational ledger verification.</summary>
 public static class Program
 {
+    /// <summary>Runs the verifier with console input/output and Ctrl+C cancellation.</summary>
     public static async Task<int> Main(string[] args)
     {
         using var cancellation = new CancellationTokenSource();
@@ -26,6 +28,7 @@ public static class Program
         }
     }
 
+    /// <summary>Runs verification with injectable output streams for hosting and tests.</summary>
     public static async Task<int> RunAsync(
         IReadOnlyList<string> args,
         TextWriter output,
@@ -96,11 +99,14 @@ public static class Program
 
             await using var ledger =
                 new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
-                    new SimingSqliteOptions { DatabasePath = database }, new());
+                    new SimingSqliteOptions
+                    {
+                        DatabasePath = database,
+                        OpenMode = SimingSqliteOpenMode.ReadOnly
+                    }, new());
             var progress = new TextProgress(error);
-            var result = await LedgerVerifier.VerifyAsync(
-                ledger, checkpoint,
-                new LedgerVerificationOptions(pageSize, progress),
+            var result = await ledger.VerifyAsync(
+                checkpoint, new LedgerVerificationOptions(pageSize, progress),
                 cancellationToken).ConfigureAwait(false);
             await WriteResultAsync(output, new
             {

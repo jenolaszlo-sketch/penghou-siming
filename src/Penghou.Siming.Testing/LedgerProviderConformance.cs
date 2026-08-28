@@ -1,5 +1,6 @@
 namespace Penghou.Siming.Testing;
 
+/// <summary>Outcome of provider-neutral behavioral conformance checks.</summary>
 public sealed record LedgerProviderConformanceResult(
     bool Passed,
     IReadOnlyList<string> Checks,
@@ -9,8 +10,10 @@ public sealed record LedgerProviderConformanceResult(
 /// Provider-neutral behavioral checks. A backend supplies a fresh ledger and
 /// remains responsible for disposing and deleting its storage afterward.
 /// </summary>
+/// <summary>Reusable behavioral contract for Siming storage providers.</summary>
 public static class LedgerProviderConformance
 {
+    /// <summary>Runs the complete conformance suite against a fresh provider.</summary>
     public static async ValueTask<LedgerProviderConformanceResult> RunAsync(
         Func<CancellationToken, ValueTask<IAppendOnlyLedger>> createLedger,
         CancellationToken cancellationToken = default)

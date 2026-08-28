@@ -10,8 +10,12 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Penghou.Siming.Sqlite</PackageId>
+    <Title>Penghou Siming SQLite</Title>
+    <Description>Transactional SQLite persistence for the Penghou.Siming tamper-evident append-only ledger.</Description>
+    <PackageTags>sqlite;ledger;audit;hash-chain;tamper-evident;provenance</PackageTags>
   </PropertyGroup>
 
 </Project>

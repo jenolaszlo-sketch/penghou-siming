@@ -10,8 +10,12 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Penghou.Siming.Cryptography</PackageId>
+    <Title>Penghou Siming Cryptography</Title>
+    <Description>Optional detached Ed25519 checkpoint signing and public-key verification for Penghou.Siming.</Description>
+    <PackageTags>ed25519;signatures;checkpoints;ledger;audit;cryptography</PackageTags>
   </PropertyGroup>
 
 </Project>

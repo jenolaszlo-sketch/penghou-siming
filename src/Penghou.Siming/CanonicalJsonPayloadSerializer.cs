@@ -4,14 +4,20 @@ using System.Text.Json;
 
 namespace Penghou.Siming;
 
+/// <summary>Serializes values using the deterministic Penghou canonical JSON v1 contract.</summary>
+/// <param name="serializerOptions">Options for the initial CLR-to-JSON conversion.</param>
 public sealed class CanonicalJsonPayloadSerializer(JsonSerializerOptions? serializerOptions = null) : ILedgerPayloadSerializer
 {
+    /// <summary>Stable serialization format identifier.</summary>
     public const string Format = "penghou-canonical-json";
+    /// <summary>Canonical JSON format version.</summary>
     public const int Version = 1;
     private readonly JsonSerializerOptions options = serializerOptions is null ? new(JsonSerializerDefaults.Web) : new(serializerOptions);
 
+    /// <inheritdoc />
     public SerializedLedgerPayload Serialize<T>(T payload) => new(Canonicalize(JsonSerializer.SerializeToElement(payload, options)), "application/json", Format, Version);
 
+    /// <summary>Produces deterministic UTF-8 JSON bytes from a JSON tree.</summary>
     public static ReadOnlyMemory<byte> Canonicalize(JsonElement element)
     {
         var buffer = new ArrayBufferWriter<byte>();

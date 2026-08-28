@@ -5,17 +5,20 @@ using NSec.Cryptography;
 
 namespace Penghou.Siming.Cryptography;
 
+/// <summary>Detached signature envelope containing exact portable checkpoint bytes.</summary>
 public sealed record SignedLedgerCheckpoint(
     string Algorithm,
     string KeyId,
     ReadOnlyMemory<byte> CheckpointDocument,
     ReadOnlyMemory<byte> Signature);
 
+/// <summary>Creates, verifies, imports, and exports signed checkpoint envelopes.</summary>
 public static class SignedLedgerCheckpoints
 {
     private static readonly byte[] Domain =
         "penghou-siming-signed-checkpoint-v1\0"u8.ToArray();
 
+    /// <summary>Signs a canonical portable checkpoint document.</summary>
     public static SignedLedgerCheckpoint Sign(
         LedgerCheckpoint checkpoint,
         Ed25519CheckpointSigner signer)
@@ -26,6 +29,7 @@ public static class SignedLedgerCheckpoints
             signer.Sign(CreateInput(signer.KeyId, document)));
     }
 
+    /// <summary>Verifies the signature and imports the authenticated checkpoint.</summary>
     public static bool Verify(
         SignedLedgerCheckpoint signed,
         Ed25519CheckpointVerifier verifier,
@@ -51,6 +55,7 @@ public static class SignedLedgerCheckpoints
         }
     }
 
+    /// <summary>Exports a deterministic signed checkpoint JSON envelope.</summary>
     public static byte[] Export(SignedLedgerCheckpoint signed)
     {
         ArgumentNullException.ThrowIfNull(signed);
@@ -69,6 +74,7 @@ public static class SignedLedgerCheckpoints
         return buffer.ToArray();
     }
 
+    /// <summary>Imports a signed checkpoint envelope without trusting its signature.</summary>
     public static SignedLedgerCheckpoint Import(ReadOnlySpan<byte> utf8Json)
     {
         try
@@ -109,10 +115,12 @@ public static class SignedLedgerCheckpoints
     }
 }
 
+/// <summary>Ed25519 private-key checkpoint signer.</summary>
 public sealed class Ed25519CheckpointSigner : IDisposable
 {
     private static readonly SignatureAlgorithm Algorithm = SignatureAlgorithm.Ed25519;
     private readonly Key key;
+    /// <summary>Gets the caller-assigned key identifier committed by signatures.</summary>
     public string KeyId { get; }
 
     private Ed25519CheckpointSigner(Key key, string keyId)
@@ -121,12 +129,14 @@ public sealed class Ed25519CheckpointSigner : IDisposable
         KeyId = RequireKeyId(keyId);
     }
 
+    /// <summary>Generates a new plaintext-exportable Ed25519 key for the preview API.</summary>
     public static Ed25519CheckpointSigner Generate(string keyId) => new(
         Key.Create(Algorithm, new KeyCreationParameters
         {
             ExportPolicy = KeyExportPolicies.AllowPlaintextExport
         }), keyId);
 
+    /// <summary>Imports a raw Ed25519 private key.</summary>
     public static Ed25519CheckpointSigner Import(
         ReadOnlySpan<byte> privateKey,
         string keyId) => new(
@@ -136,9 +146,12 @@ public sealed class Ed25519CheckpointSigner : IDisposable
                     ExportPolicy = KeyExportPolicies.AllowPlaintextExport
                 }), keyId);
 
+    /// <summary>Exports the raw private key. The caller must protect and clear it.</summary>
     public byte[] ExportPrivateKey() => key.Export(KeyBlobFormat.RawPrivateKey);
+    /// <summary>Exports the raw public verification key.</summary>
     public byte[] ExportPublicKey() => key.PublicKey.Export(KeyBlobFormat.RawPublicKey);
     internal byte[] Sign(ReadOnlySpan<byte> input) => Algorithm.Sign(key, input);
+    /// <inheritdoc />
     public void Dispose() => key.Dispose();
 
     private static string RequireKeyId(string value) =>
@@ -147,12 +160,15 @@ public sealed class Ed25519CheckpointSigner : IDisposable
             : value;
 }
 
+/// <summary>Public-key-only Ed25519 checkpoint verifier.</summary>
 public sealed class Ed25519CheckpointVerifier
 {
     private static readonly SignatureAlgorithm Algorithm = SignatureAlgorithm.Ed25519;
     private readonly PublicKey key;
+    /// <summary>Gets the expected key identifier.</summary>
     public string KeyId { get; }
 
+    /// <summary>Imports a raw Ed25519 public key and its expected identifier.</summary>
     public Ed25519CheckpointVerifier(ReadOnlySpan<byte> publicKey, string keyId)
     {
         key = PublicKey.Import(Algorithm, publicKey, KeyBlobFormat.RawPublicKey);

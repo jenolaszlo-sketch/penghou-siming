@@ -6,12 +6,6 @@ decisions live in the [implementation plan](implementation-plan.md) and
 
 ## Priority 1 — Harden verification and trust boundaries
 
-- [ ] Add a strict SQLite read-only open path. The verifier CLI must never run
-  initialization, migration, metadata insertion, or mutating PRAGMAs.
-- [ ] Verify through one provider snapshot. SQLite should hold one read
-  transaction for ledger identity, captured head, pages, and checkpoint lookup.
-- [ ] Validate append-only trigger bodies, unique/partial index definitions, and
-  required `CHECK` constraints—not only table columns.
 - [ ] Unify synchronous and asynchronous verification behind one incremental
   state machine with precise head/snapshot failure diagnostics.
 - [ ] Bound checkpoint, key, metadata, text, and payload sizes; hash large
@@ -43,9 +37,9 @@ decisions live in the [implementation plan](implementation-plan.md) and
 ## Priority 3 — Package readiness
 
 - [ ] Establish public API baselines and compatibility policy.
-- [ ] Add XML documentation and complete usage examples.
-- [ ] Add cross-platform CI, package metadata, Source Link, deterministic builds,
-  symbols, and preview publishing.
+- [ ] Complete API usage examples beyond the package README.
+- [ ] Expand CI beyond Linux and establish package/public-API compatibility
+  baselines.
 - [ ] Review trimming, Native AOT, and supported target frameworks.
 - [ ] Benchmark append, pagination, verification, and large payloads.
 - [ ] Publish threat-model, retention, backup, signing-key, and checkpoint
