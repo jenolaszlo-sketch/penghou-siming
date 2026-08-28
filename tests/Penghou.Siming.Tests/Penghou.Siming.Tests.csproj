@@ -26,4 +26,8 @@
     <ProjectReference Include="..\..\src\Penghou.Siming.Testing\Penghou.Siming.Testing.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\vectors\guyabano-canonical-json-v2.json" Link="vectors\guyabano-canonical-json-v2.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

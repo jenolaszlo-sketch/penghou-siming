@@ -15,6 +15,9 @@ public sealed record SimingSqliteOptions
     /// <summary>Controls whether the provider may create and append or only read.</summary>
     public SimingSqliteOpenMode OpenMode { get; init; } =
         SimingSqliteOpenMode.ReadWriteCreate;
+
+    /// <summary>Gets append-input limits enforced before opening a write transaction.</summary>
+    public LedgerInputLimits InputLimits { get; init; } = LedgerInputLimits.Default;
 }
 
 /// <summary>SQLite provider access intent.</summary>

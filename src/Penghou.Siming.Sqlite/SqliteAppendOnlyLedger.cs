@@ -26,6 +26,8 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.DatabasePath);
+        ArgumentNullException.ThrowIfNull(options.InputLimits);
+        options.InputLimits.Validate();
         this.options = options;
         this.serializer = serializer;
         this.timeProvider = timeProvider ?? TimeProvider.System;
@@ -81,6 +83,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         if (options.OpenMode == SimingSqliteOpenMode.ReadOnly)
             throw new InvalidOperationException(
                 "Cannot append through a read-only Siming SQLite ledger.");
+        options.InputLimits.ValidateAppend(streamId, eventType, payload, idempotencyKey);
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace Penghou.Siming.Tests;
 
@@ -28,4 +29,23 @@ public sealed class CanonicalJsonPayloadSerializerTests
         Assert.Equal(CanonicalJsonPayloadSerializer.Version, result.SerializationVersion);
         Assert.Equal("{\"value\":42}", Encoding.UTF8.GetString(result.Bytes.Span));
     }
+
+    [Fact]
+    public void Canonicalize_MatchesPortableGuyabanoV2Vectors()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "vectors", "guyabano-canonical-json-v2.json");
+        var vectors = JsonSerializer.Deserialize<CanonicalVector[]>(
+            File.ReadAllText(path),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+
+        foreach (var vector in vectors)
+        {
+            using var input = JsonDocument.Parse(vector.InputJson);
+            var bytes = CanonicalJsonPayloadSerializer.Canonicalize(input.RootElement);
+            Assert.Equal(vector.CanonicalJson, Encoding.UTF8.GetString(bytes.Span));
+            Assert.Equal(vector.Sha256, Convert.ToHexString(SHA256.HashData(bytes.Span)).ToLowerInvariant());
+        }
+    }
+
+    private sealed record CanonicalVector(string Name, string InputJson, string CanonicalJson, string Sha256);
 }

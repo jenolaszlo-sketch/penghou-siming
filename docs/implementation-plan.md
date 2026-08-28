@@ -123,9 +123,8 @@ definitive.
 Canonical JSON is a convenience serializer and a reusable logical-content
 identity tool, not a requirement for every ledger payload.
 
-The implementation should use RFC 8785 if it can satisfy the required .NET
-compatibility and existing Guyabano semantics. Otherwise, publish an exact
-Penghou canonical JSON contract covering:
+Siming uses a named Penghou canonical JSON contract rather than claiming RFC
+8785 compliance. It matches Guyabano artifact hash contract `v2` and covers:
 
 - ordinal property ordering;
 - preserved array order;
@@ -134,9 +133,20 @@ Penghou canonical JSON contract covering:
 - deterministic number representation;
 - explicit null, boolean, string, array, and object handling.
 
-Before Guyabano deletes its local canonicalizer, Siming must publish golden
-vectors proving compatibility with Guyabano artifact hash contract `v2`.
-Existing Guyabano hashes must never be reinterpreted.
+Portable golden vectors contain input JSON, expected canonical JSON, and an
+independently reproducible SHA-256 value. They lock compatibility before
+Guyabano deletes its local canonicalizer. Existing Guyabano hashes must never be
+reinterpreted.
+
+### Input limits
+
+- All providers enforce the same configurable `LedgerInputLimits` policy.
+- Payloads and UTF-8 byte lengths of stream IDs, event types, content types,
+  serialization formats, and idempotency keys are checked before persistence.
+- Typed serialization output is subject to the same payload limit as raw bytes.
+- A rejected append never advances the ledger head.
+- Limits are operational policy and are deliberately not part of the v1 hash
+  format, so providers and deployments may choose stricter bounds.
 
 ### Hash format
 
@@ -250,10 +260,10 @@ golden vectors.
 
 1. Unify synchronous and paged verification behind one incremental state
    machine with precise failure categories.
-2. Bound untrusted input and hash large envelopes incrementally.
+2. Bound checkpoint/key inputs and hash large envelopes incrementally.
 3. Make generated signing keys non-exportable by default and formalize external
    signer/key-store extension points.
-4. Complete canonical JSON and adversarial-test decisions.
+4. Complete remaining adversarial-test coverage.
 5. Specify public context binding and optional keyed suites without changing v1.
 6. Establish package compatibility baselines and operational guidance, then
    begin Guyabano adoption.
@@ -354,16 +364,14 @@ measurements demonstrate a real need.
 
 ## Open decisions
 
-1. RFC 8785 exactly versus a named Penghou canonical JSON contract compatible
-   with Guyabano artifact hash `v2`.
-2. Application schema identity/version in a future envelope.
-3. Exact public ledger-context schema and lifecycle.
-4. Whether keyed hashing belongs in core or the cryptography package.
-5. Key rotation semantics: new ledger epoch, suite transition event, or both.
-6. Supported target frameworks for the first preview.
-7. First independent Guyabano checkpoint location: Git trailer, Git note,
+1. Application schema identity/version in a future envelope.
+2. Exact public ledger-context schema and lifecycle.
+3. Whether keyed hashing belongs in core or the cryptography package.
+4. Key rotation semantics: new ledger epoch, suite transition event, or both.
+5. Supported target frameworks for the first preview.
+6. First independent Guyabano checkpoint location: Git trailer, Git note,
    separate file, or multiple anchors.
-8. Guyabano payload classification and retention policy for prompts, model
+7. Guyabano payload classification and retention policy for prompts, model
    responses, tool output, and generated content.
 
 ## Current repository state
@@ -382,8 +390,12 @@ measurements demonstrate a real need.
   recovery, true multi-process contention, deterministic busy-timeout behavior,
   strict read-only operation, stable verification snapshots, and schema-object
   compatibility coverage.
-- The full suite passes 45 tests (24 core and 21 SQLite), and the independent
+- The full suite passes 48 tests (26 core and 22 SQLite), and the independent
   Python verifier reproduces the v1 golden hash.
+- Canonical JSON is cross-checked against portable Guyabano `v2` compatibility
+  vectors, including exponent, negative-zero, escaping, and property ordering.
+- Provider-neutral append limits cover payload and UTF-8 metadata sizes before
+  mutation; custom limits are tested in both in-memory and SQLite providers.
 - Portable and signed checkpoints, bounded verification, progress,
   cancellation, and the operational verifier CLI are implemented.
 - The repository is committed and connected to its GitHub remote.

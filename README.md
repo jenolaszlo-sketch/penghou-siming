@@ -50,6 +50,8 @@ be finalized before the first preview release.
   committed, and atomically deduplicated by every conforming provider.
 - Sensitive payload retention is a caller policy. Applications should prefer
   bounded provenance and content identities over raw secrets or model payloads.
+- Append inputs are bounded before persistence. Defaults are conservative and
+  each provider accepts the same provider-neutral `LedgerInputLimits` policy.
 - The v1 suite uses unkeyed SHA-256. Planned evolution distinguishes public
   ledger-context binding from optional externally keyed hashing; neither will
   reinterpret v1 history or replace trusted checkpoints.
@@ -71,6 +73,26 @@ var verification = await LedgerVerifier.VerifyAsync(
     new LedgerVerificationOptions(PageSize: 1000, Progress: progress),
     cancellationToken);
 ```
+
+Typed payloads can use `CanonicalJsonPayloadSerializer`; its named canonical
+JSON contract is compatible with Guyabano artifact hash `v2` and is protected by
+portable JSON/hash vectors. Configure stricter append limits when appropriate:
+
+```csharp
+var options = new SimingSqliteOptions
+{
+    DatabasePath = "session-ledger.db",
+    InputLimits = LedgerInputLimits.Default with
+    {
+        MaxPayloadBytes = 1024 * 1024,
+        MaxEventTypeUtf8Bytes = 128
+    }
+};
+```
+
+Text limits measure encoded UTF-8 bytes, not UTF-16 characters. Limit failures
+occur before SQLite opens a write transaction and expose the rejected field,
+actual byte count, and configured maximum.
 
 Verification captures the target head and processes bounded pages without
 retaining the complete ledger. Cancellation is checked between reads and rows;

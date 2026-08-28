@@ -7,6 +7,22 @@ namespace Penghou.Siming.Sqlite.Tests;
 
 public sealed class SqliteAppendOnlyLedgerTests : IDisposable
 {
+    [Fact]
+    public async Task Append_RejectsOversizedUtf8InputWithoutPersistingAnEntry()
+    {
+        var options = Options("limits.db") with
+        {
+            InputLimits = LedgerInputLimits.Default with { MaxStreamIdUtf8Bytes = 3 }
+        };
+        await using var ledger = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(options, new());
+
+        var error = await Assert.ThrowsAsync<LedgerInputLimitExceededException>(() =>
+            ledger.AppendAsync(new LedgerAppendRequest("éé", "e", Array.Empty<byte>())).AsTask());
+
+        Assert.Equal("streamId", error.FieldName);
+        Assert.Equal(4, error.ActualBytes);
+        Assert.Equal(0, (await ledger.GetHeadAsync()).Sequence);
+    }
     private readonly string root = Path.Combine(
         Path.GetTempPath(),
         $"siming-sqlite-{Guid.NewGuid():N}");

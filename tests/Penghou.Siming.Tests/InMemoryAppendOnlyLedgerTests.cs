@@ -3,6 +3,20 @@ namespace Penghou.Siming.Tests;
 public sealed class InMemoryAppendOnlyLedgerTests
 {
     [Fact]
+    public async Task Append_RejectsOversizedSerializedInputWithoutAdvancingHead()
+    {
+        await using var ledger = new InMemoryAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            new(), inputLimits: LedgerInputLimits.Default with { MaxPayloadBytes = 3 });
+
+        var error = await Assert.ThrowsAsync<LedgerInputLimitExceededException>(() =>
+            ledger.AppendAsync(new LedgerAppendRequest("s", "e", new byte[4])).AsTask());
+
+        Assert.Equal("payload", error.FieldName);
+        Assert.Equal(4, error.ActualBytes);
+        Assert.Equal(3, error.MaximumBytes);
+        Assert.Equal(0, (await ledger.GetHeadAsync()).Sequence);
+    }
+    [Fact]
     public async Task TypedAndRawAppends_FormOneVerifiableGlobalChain()
     {
         await using var ledger = new InMemoryAppendOnlyLedger<CanonicalJsonPayloadSerializer>(

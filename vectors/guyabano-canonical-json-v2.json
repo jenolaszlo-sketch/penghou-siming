@@ -1,0 +1,20 @@
+[
+  {
+    "name": "nested-property-order",
+    "inputJson": "{\"z\":1,\"a\":{\"b\":2,\"a\":true}}",
+    "canonicalJson": "{\"a\":{\"a\":true,\"b\":2},\"z\":1}",
+    "sha256": "89f91cb53e30eb60132ff5526fa0d13ca0019ae4743c87e73e14a9db3a2433aa"
+  },
+  {
+    "name": "number-and-string-normalization",
+    "inputJson": "{\"text\":\"<tag>\\u2028\",\"small\":1e-07,\"negativeZero\":-0.0}",
+    "canonicalJson": "{\"negativeZero\":0,\"small\":1E-07,\"text\":\"\\u003Ctag\\u003E\\u2028\"}",
+    "sha256": "ec24ba4aad226b6ca13e5e24b0d38b26e1c25311de94edbf112beff04f48dbd9"
+  },
+  {
+    "name": "guyabano-artifact",
+    "inputJson": "{\"status\":2,\"schemaVersion\":1,\"payload\":{\"taskId\":\"T-1\",\"files\":[{\"path\":\"src/A.cs\",\"hash\":\"abc\"}]},\"kind\":\"generated-file-manifest\",\"inputArtifactIds\":[\"artifact:a\",\"artifact:z\"]}",
+    "canonicalJson": "{\"inputArtifactIds\":[\"artifact:a\",\"artifact:z\"],\"kind\":\"generated-file-manifest\",\"payload\":{\"files\":[{\"hash\":\"abc\",\"path\":\"src/A.cs\"}],\"taskId\":\"T-1\"},\"schemaVersion\":1,\"status\":2}",
+    "sha256": "6579553c35bffbe764487088e5589bba1dbf2bf2e146294702d773d2fa6aac3b"
+  }
+]

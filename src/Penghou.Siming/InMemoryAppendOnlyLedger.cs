@@ -10,12 +10,15 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
     private readonly Dictionary<string, LedgerEntry> idempotentEntries = new(StringComparer.Ordinal);
     private readonly TSerializer serializer;
     private readonly TimeProvider timeProvider;
+    private readonly LedgerInputLimits inputLimits;
 
     /// <summary>Creates an in-memory ledger.</summary>
-    public InMemoryAppendOnlyLedger(TSerializer serializer, TimeProvider? timeProvider = null, LedgerId? ledgerId = null)
+    public InMemoryAppendOnlyLedger(TSerializer serializer, TimeProvider? timeProvider = null, LedgerId? ledgerId = null, LedgerInputLimits? inputLimits = null)
     {
         this.serializer = serializer;
         this.timeProvider = timeProvider ?? TimeProvider.System;
+        this.inputLimits = inputLimits ?? LedgerInputLimits.Default;
+        this.inputLimits.Validate();
         LedgerId = ledgerId ?? Penghou.Siming.LedgerId.New();
     }
 
@@ -38,6 +41,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
 
     private async ValueTask<LedgerEntry> AppendSerializedAsync(string streamId, string eventType, SerializedLedgerPayload payload, string? idempotencyKey, CancellationToken cancellationToken)
     {
+        inputLimits.ValidateAppend(streamId, eventType, payload, idempotencyKey);
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {

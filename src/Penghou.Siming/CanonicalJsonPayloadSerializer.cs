@@ -46,10 +46,34 @@ public sealed class CanonicalJsonPayloadSerializer(JsonSerializerOptions? serial
 
     private static void WriteNumber(Utf8JsonWriter writer, JsonElement element)
     {
-        if (element.TryGetInt64(out var integer)) { writer.WriteNumberValue(integer); return; }
-        if (element.TryGetDecimal(out var decimalValue)) { writer.WriteRawValue(decimalValue.ToString("G29", CultureInfo.InvariantCulture)); return; }
+        if (element.TryGetDecimal(out var decimalValue))
+        {
+            writer.WriteRawValue(decimalValue == 0
+                ? "0"
+                : decimalValue.ToString("G29", CultureInfo.InvariantCulture));
+            return;
+        }
         var value = element.GetDouble();
         if (!double.IsFinite(value)) throw new JsonException("Non-finite JSON numbers are unsupported.");
-        writer.WriteRawValue(value.ToString("R", CultureInfo.InvariantCulture).Replace("E+", "e", StringComparison.Ordinal).Replace("E", "e", StringComparison.Ordinal));
+        if (value == 0)
+        {
+            writer.WriteRawValue("0");
+            return;
+        }
+        var formatted = value.ToString("R", CultureInfo.InvariantCulture)
+            .Replace("E+", "e", StringComparison.Ordinal)
+            .Replace("E", "e", StringComparison.Ordinal);
+        var exponent = formatted.IndexOf('e');
+        if (exponent >= 0)
+        {
+            var prefix = formatted[..(exponent + 1)];
+            var suffix = formatted[(exponent + 1)..];
+            var negative = suffix.StartsWith("-", StringComparison.Ordinal);
+            suffix = suffix.TrimStart('+', '-').TrimStart('0');
+            if (suffix.Length == 0)
+                suffix = "0";
+            formatted = prefix + (negative ? "-" : string.Empty) + suffix;
+        }
+        writer.WriteRawValue(formatted);
     }
 }

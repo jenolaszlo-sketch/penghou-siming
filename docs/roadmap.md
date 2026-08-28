@@ -8,16 +8,14 @@ decisions live in the [implementation plan](implementation-plan.md) and
 
 - [ ] Unify synchronous and asynchronous verification behind one incremental
   state machine with precise head/snapshot failure diagnostics.
-- [ ] Bound checkpoint, key, metadata, text, and payload sizes; hash large
-  envelopes incrementally rather than copying the entire payload.
+- [ ] Bound checkpoint and signing-key inputs; hash large envelopes
+  incrementally rather than copying the entire payload.
 - [ ] Make generated signing keys non-exportable by default and define extension
   points for OS, HSM, and remote signers.
 - [ ] Return machine-readable CLI input errors and the verified key fingerprint.
 
 ## Priority 2 — Complete and evolve the cryptographic contract
 
-- [ ] Decide whether canonical JSON is RFC 8785 or a documented, versioned
-  Penghou contract compatible with Guyabano artifact hash `v2`.
 - [ ] Complete adversarial coverage for every committed field, malformed
   encoding, insertion, deletion, reordering, truncation, replacement chains,
   culture, and unsupported versions.
