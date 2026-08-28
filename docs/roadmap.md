@@ -58,7 +58,22 @@ decisions live in the [implementation plan](implementation-plan.md) and
 
 ## Deferred until demonstrated need
 
-- Merkle accumulators and inclusion proofs.
+- [ ] Add optional Merkle proof support after Guyabano integration and
+  verification benchmarks demonstrate a need for selective disclosure or
+  sublinear verification. Treat the accumulator as a rebuildable index over
+  authoritative ledger entries, not as replacement storage.
+  - Specify versioned leaf, node, root, and proof encodings with independent
+    golden vectors.
+  - Evaluate a Merkle Mountain Range and a Certificate Transparency-style tree
+    for append performance, proof size, and implementation simplicity.
+  - Provide inclusion proofs for individual entries and consistency proofs that
+    a newer root is an append-only extension of an earlier root.
+  - Capture Merkle roots in checkpoints and support the existing detached
+    signature and external anchoring mechanisms.
+  - Define transactional SQLite maintenance, crash recovery, deterministic
+    rebuilding, corruption diagnostics, and provider-neutral APIs.
+  - Benchmark proof generation, verification, storage overhead, and rebuilds on
+    realistic Guyabano ledgers before making the feature part of the stable API.
 - Replication, networking, consensus, or blockchain semantics.
 - Remote checkpoint services and hardware-backed signing.
 - Independent per-stream chains unless a demonstrated use case justifies the
