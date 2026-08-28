@@ -28,9 +28,11 @@ anchored in Git, signed, or stored elsewhere.
 | --- | --- |
 | `Penghou.Siming` | Cryptographic format, canonical payload contracts, verification, ledger heads, and checkpoints |
 | `Penghou.Siming.Sqlite` | SQLite persistence, atomic transactions, writer serialization, crash recovery, and append-only enforcement |
+| `Penghou.Siming.Cryptography` | Optional detached Ed25519 checkpoint signing and public-key verification |
 | `Penghou.Siming.Testing` | Provider-neutral conformance checks reusable by SQLite and future storage providers |
+| `Penghou.Siming.Verify` | Standalone SQLite ledger and checkpoint verification CLI |
 
-Both packages initially target .NET 8. Multi-targeting and packaging policy will
+The projects currently target .NET 8. Multi-targeting and packaging policy will
 be finalized before the first preview release.
 
 ## Design principles
@@ -48,6 +50,9 @@ be finalized before the first preview release.
   committed, and atomically deduplicated by every conforming provider.
 - Sensitive payload retention is a caller policy. Applications should prefer
   bounded provenance and content identities over raw secrets or model payloads.
+- The v1 suite uses unkeyed SHA-256. Planned evolution distinguishes public
+  ledger-context binding from optional externally keyed hashing; neither will
+  reinterpret v1 history or replace trusted checkpoints.
 
 ## Planned usage
 
@@ -59,23 +64,46 @@ var entry = await ledger.AppendAsync(
     eventType: "WorkspacePromoted",
     canonicalPayload: payloadBytes);
 
-var checkpoint = await ledger.GetHeadAsync();
-var verification = await ledger.VerifyAsync();
+var checkpoint = await LedgerCheckpoints.CaptureAsync(ledger);
+var verification = await LedgerVerifier.VerifyAsync(
+    ledger,
+    checkpoint,
+    new LedgerVerificationOptions(PageSize: 1000, Progress: progress),
+    cancellationToken);
 ```
 
-The API is scaffolding and may change before the first package release.
+Verification captures the target head and processes bounded pages without
+retaining the complete ledger. Cancellation is checked between reads and rows;
+progress is reported at page boundaries.
+
+To verify a SQLite database from a terminal:
+
+```powershell
+dotnet run --project src/Penghou.Siming.Verify -- ledger.db --checkpoint checkpoint.json
+```
+
+The CLI also accepts `--signed-checkpoint`, `--public-key`, and `--key-id`.
+It prints one JSON result to standard output, progress to standard error, and
+returns `0` for valid, `1` for verification failure, `2` for invalid input, or
+`130` for cancellation. It refuses a missing database. Until the roadmap's
+strict read-only provider path is implemented, run it on a copy: opening an
+existing incomplete database can invoke normal SQLite initialization.
+
+The API remains pre-release and may change before the first package release.
 
 ## Repository layout
 
 ```text
 src/Penghou.Siming
 src/Penghou.Siming.Sqlite
+src/Penghou.Siming.Cryptography
 src/Penghou.Siming.Testing
+src/Penghou.Siming.Verify
 tests/Penghou.Siming.Tests
 tests/Penghou.Siming.Sqlite.Tests
 docs
 ```
 
 Start with the [implementation plan](docs/implementation-plan.md), then see the
-[roadmap](docs/roadmap.md) and
+[unfinished roadmap](docs/roadmap.md) and
 [persistence contract](docs/persistence-contract.md).

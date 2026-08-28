@@ -70,3 +70,19 @@ public enum LedgerVerificationFailure
 }
 
 public sealed record LedgerVerificationResult(bool IsValid, long VerifiedEntries, LedgerHead VerifiedHead, long? FailedSequence = null, LedgerVerificationFailure? Failure = null, string? Detail = null);
+
+public sealed record LedgerVerificationOptions(
+    int PageSize = 1_000,
+    IProgress<LedgerVerificationProgress>? Progress = null)
+{
+    public void Validate()
+    {
+        if (PageSize is <= 0 or > LedgerReadRequest.MaximumLimit)
+            throw new ArgumentOutOfRangeException(nameof(PageSize));
+    }
+}
+
+public sealed record LedgerVerificationProgress(
+    long VerifiedEntries,
+    long TargetEntries,
+    LedgerHash VerifiedHash);

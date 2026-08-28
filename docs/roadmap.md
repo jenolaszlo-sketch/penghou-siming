@@ -1,59 +1,58 @@
 # Roadmap
 
-## Milestone 0 — Contract foundation
+This file contains only unfinished work. Implemented behavior and accepted
+decisions live in the [implementation plan](implementation-plan.md) and
+[persistence contract](persistence-contract.md).
 
-- [x] Create the core, SQLite, and test project structure.
-- [x] Define initial byte-oriented ledger, entry, head, checkpoint, and
-  verification contracts.
-- [x] Freeze the initial v1 binary hash-input specification and deterministic
-  genesis in code and documentation.
-- [ ] Decide whether canonical JSON follows RFC 8785 exactly or a documented
-  Penghou canonical JSON contract shared with Guyabano.
-- [x] Add the first deterministic golden vector; add an independent non-.NET
-  reproduction before declaring Milestone 0 complete.
+## Priority 1 — Harden verification and trust boundaries
 
-## Milestone 1 — Core cryptographic format
+- [ ] Add a strict SQLite read-only open path. The verifier CLI must never run
+  initialization, migration, metadata insertion, or mutating PRAGMAs.
+- [ ] Verify through one provider snapshot. SQLite should hold one read
+  transaction for ledger identity, captured head, pages, and checkpoint lookup.
+- [ ] Validate append-only trigger bodies, unique/partial index definitions, and
+  required `CHECK` constraints—not only table columns.
+- [ ] Unify synchronous and asynchronous verification behind one incremental
+  state machine with precise head/snapshot failure diagnostics.
+- [ ] Bound checkpoint, key, metadata, text, and payload sizes; hash large
+  envelopes incrementally rather than copying the entire payload.
+- [ ] Make generated signing keys non-exportable by default and define extension
+  points for OS, HSM, and remote signers.
+- [ ] Return machine-readable CLI input errors and the verified key fingerprint.
 
-- [x] Implement immutable hash and identifier value types.
-- [x] Implement big-endian, fixed-width and length-delimited v1 encoding.
-- [x] Include ledger identity, format version, sequence, stream, committed time,
-  event type, payload, and previous hash in every row hash.
-- [x] Implement canonical JSON serialization and pre-canonicalized byte input.
-- [x] Implement full-chain and checkpoint-aware verification diagnostics.
-- [ ] Test malformed encoding, mutation, deletion, insertion, reordering,
-  truncation, replacement chains, and unsupported versions.
-- [x] Define the provider-neutral ledger/read contracts and a reusable
-  `Penghou.Siming.Testing` conformance suite; SQLite and future providers share
-  the same behavioral contract.
-- [x] Add cryptographically committed, atomically enforced provider-neutral
-  idempotency with replay and conflict conformance tests.
+## Priority 2 — Complete and evolve the cryptographic contract
 
-## Milestone 2 — SQLite backend
+- [ ] Decide whether canonical JSON is RFC 8785 or a documented, versioned
+  Penghou contract compatible with Guyabano artifact hash `v2`.
+- [ ] Complete adversarial coverage for every committed field, malformed
+  encoding, insertion, deletion, reordering, truncation, replacement chains,
+  culture, and unsupported versions.
+- [ ] Add immutable public ledger-context binding in a future format/ledger
+  epoch. Commit a canonical digest of application, environment, tenant,
+  deployment, or similar external identity.
+- [ ] Design an optional keyed suite such as `hmac-sha256-v1`. Keep the secret
+  external; persist only suite and key ID; define rotation, availability,
+  backup, and recovery behavior.
+- [ ] Never retrofit or reinterpret v1. Publish independent golden vectors for
+  every context-bound or keyed suite.
+- [ ] Document that public context is not secrecy, keyed hashing is not payload
+  encryption, and neither replaces independently retained checkpoints.
+- [ ] Decide whether a future envelope commits application schema identity and
+  version.
 
-- [x] Add `Microsoft.Data.Sqlite` and create immutable metadata and ledger tables.
-- [x] Add explicit missing-column and unsupported-format compatibility
-  diagnostics beyond normal SQLite constraint/query failures.
-- [x] Implement atomic append using an immediate SQLite write transaction.
-- [x] Prove concurrent callers across separate provider instances cannot allocate
-  the same sequence or previous head.
-- [x] Add `UPDATE` and `DELETE` rejection triggers for entries and metadata.
-- [x] Implement ordered and paged reads plus stream filtering.
-- [x] Test rollback at every append boundary, cancellation after insert, reopen,
-  killed-process WAL recovery, and multi-process writer contention.
-- [x] Add deterministic busy-timeout coverage and broaden schema type/constraint
-  compatibility inspection.
+## Priority 3 — Package readiness
 
-## Milestone 3 — Checkpoints and operational verification
+- [ ] Establish public API baselines and compatibility policy.
+- [ ] Add XML documentation and complete usage examples.
+- [ ] Add cross-platform CI, package metadata, Source Link, deterministic builds,
+  symbols, and preview publishing.
+- [ ] Review trimming, Native AOT, and supported target frameworks.
+- [ ] Benchmark append, pagination, verification, and large payloads.
+- [ ] Publish threat-model, retention, backup, signing-key, and checkpoint
+  operational guidance.
+- [ ] Add a Git trailer/note checkpoint anchoring sample or adapter.
 
-- [x] Export portable, versioned JSON checkpoints.
-- [x] Verify exact heads and valid extensions of earlier checkpoints.
-- [x] Detect ledger identity mismatch and rollback against a newer checkpoint.
-- [ ] Add bounded verification progress and cancellation.
-- [ ] Design optional Ed25519 signed checkpoints without coupling keys to the
-  core persistence package.
-- [ ] Prototype a standalone verifier CLI after the library contract stabilizes.
-
-## Milestone 4 — Guyabano adoption
+## Priority 4 — Guyabano adoption
 
 - [ ] Add `Guyabano.Session.Sqlite` as the domain adapter; keep coding-specific
   event types out of Siming.
@@ -65,7 +64,7 @@
   independently retained location.
 - [ ] Add end-to-end crash, retry, reconciliation, and projection-rebuild tests.
 
-## Deferred
+## Deferred until demonstrated need
 
 - Merkle accumulators and inclusion proofs.
 - Replication, networking, consensus, or blockchain semantics.

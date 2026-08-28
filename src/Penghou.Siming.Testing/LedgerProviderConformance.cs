@@ -70,9 +70,34 @@ public static class LedgerProviderConformance
             Require(stream.Count == 1 && stream[0].Sequence == 1, "stream filter");
             checks.Add("queries");
 
-            var verification = await ledger.VerifyAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            var progress = new RecordingProgress();
+            var verification = await LedgerVerifier.VerifyAsync(
+                ledger,
+                options: new LedgerVerificationOptions(PageSize: 1, Progress: progress),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
             Require(verification.IsValid && verification.VerifiedEntries == 2, "verification");
-            checks.Add("verification");
+            Require(progress.Values.Select(item => item.VerifiedEntries)
+                .SequenceEqual([0L, 1L, 2L]), "bounded verification progress");
+            checks.Add("bounded-verification");
+
+            using var cancelled = new CancellationTokenSource();
+            var cancellingProgress = new CallbackProgress(value =>
+            {
+                if (value.VerifiedEntries == 1)
+                    cancelled.Cancel();
+            });
+            try
+            {
+                await LedgerVerifier.VerifyAsync(
+                    ledger,
+                    options: new LedgerVerificationOptions(1, cancellingProgress),
+                    cancellationToken: cancelled.Token).ConfigureAwait(false);
+                throw new InvalidOperationException("Ledger verification ignored cancellation.");
+            }
+            catch (OperationCanceledException) when (cancelled.IsCancellationRequested)
+            {
+            }
+            checks.Add("verification-cancellation");
             return new(true, checks);
         }
         catch (Exception exception)
@@ -95,5 +120,17 @@ public static class LedgerProviderConformance
     {
         if (!condition)
             throw new InvalidOperationException($"Ledger provider failed the {check} conformance check.");
+    }
+
+    private sealed class RecordingProgress : IProgress<LedgerVerificationProgress>
+    {
+        public List<LedgerVerificationProgress> Values { get; } = [];
+        public void Report(LedgerVerificationProgress value) => Values.Add(value);
+    }
+
+    private sealed class CallbackProgress(Action<LedgerVerificationProgress> callback) :
+        IProgress<LedgerVerificationProgress>
+    {
+        public void Report(LedgerVerificationProgress value) => callback(value);
     }
 }

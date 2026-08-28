@@ -12,6 +12,9 @@ public sealed class ProviderConformanceTests
                 new InMemoryAppendOnlyLedger<CanonicalJsonPayloadSerializer>(new())));
 
         Assert.True(result.Passed, result.Failure);
-        Assert.Equal(["empty-head", "global-chain", "idempotency", "queries", "verification"], result.Checks);
+        Assert.Equal([
+            "empty-head", "global-chain", "idempotency", "queries",
+            "bounded-verification", "verification-cancellation"
+        ], result.Checks);
     }
 }

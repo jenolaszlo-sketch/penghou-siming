@@ -11,11 +11,12 @@ public static class LedgerCheckpoints
     {
         ArgumentNullException.ThrowIfNull(ledger);
         var head = await ledger.GetHeadAsync(cancellationToken).ConfigureAwait(false);
+        var now = (timeProvider ?? TimeProvider.System).GetUtcNow();
         return new LedgerCheckpoint(
             head.LedgerId,
             head.Sequence,
             head.Hash,
-            (timeProvider ?? TimeProvider.System).GetUtcNow(),
+            DateTimeOffset.FromUnixTimeMilliseconds(now.ToUnixTimeMilliseconds()),
             head.FormatVersion);
     }
 

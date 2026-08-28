@@ -31,6 +31,13 @@ Penghou.Siming.Sqlite
 Penghou.Siming.Testing
     reusable provider conformance suite
     no dependency on SQLite
+
+Penghou.Siming.Cryptography
+    optional detached Ed25519 checkpoint signing
+    no persistence responsibility
+
+Penghou.Siming.Verify
+    operational SQLite and checkpoint verifier CLI
 ```
 
 SQLite owns storage, transactions, locking, recovery, and indexes. Siming owns
@@ -217,89 +224,46 @@ version. Verification should support:
 - detecting checkpoint/ledger identity mismatch;
 - detecting truncation or older-backup restoration against a newer checkpoint.
 
-Checkpoint storage, Git anchoring, signatures, and key management remain outside
-the core persistence responsibility. Optional Ed25519 signed-checkpoint contracts
-may be added later without making signatures mandatory.
+Checkpoint storage, Git anchoring, and key management remain outside the core
+persistence responsibility. Detached Ed25519 checkpoint signing is implemented
+in the optional cryptography package and is never mandatory.
 
-## Preferred implementation sequence
+### Context binding and keyed hashing
 
-### Milestone 0 — Freeze the persistence contract
+The phrase “external salt” is split into two explicit future features:
 
-Do this before creating durable SQLite data.
+1. **Public ledger context binding.** Canonical external context—application,
+   environment, tenant, deployment, or similar identity—is digested and
+   committed immutably. It prevents valid history from being transplanted
+   between contexts but adds no secrecy.
+2. **Optional keyed hashing.** A separately versioned suite such as
+   `hmac-sha256-v1` uses a caller-managed secret. Persistence stores the suite
+   and key ID, never the secret. This resists rewriting by an attacker holding
+   only the database but creates key rotation, availability, backup, and
+   recovery obligations.
 
-- [ ] Finalize the v1 binary envelope field list and encoding.
-- [ ] Decide RFC 8785 versus a documented Penghou canonical JSON contract.
-- [ ] Freeze ledger ID, format version, genesis, timestamp, and serializer
-  descriptor semantics.
-- [ ] Define exact-head and valid-extension checkpoint algorithms.
-- [ ] Publish golden binary/hash vectors independent of SQLite and CLR types.
-- [ ] Document forward-compatibility and unsupported-version behavior.
+Neither feature modifies v1, encrypts payloads, or replaces independently
+retained checkpoints. Each new suite needs an explicit contract and independent
+golden vectors.
 
-Exit criterion: an independent implementation can reproduce every v1 hash.
+## Immediate implementation sequence
 
-### Milestone 1 — Core cryptographic engine
+1. Make operational verification strictly non-mutating with an explicit SQLite
+   read-only open mode.
+2. Verify through a stable provider snapshot; SQLite uses one read transaction
+   for metadata, target head, pages, and checkpoint evidence.
+3. Validate trigger, index, predicate, and constraint definitions—not only table
+   columns.
+4. Unify synchronous and paged verification behind one incremental state
+   machine with precise failure categories.
+5. Bound untrusted input and hash large envelopes incrementally.
+6. Make generated signing keys non-exportable by default and formalize external
+   signer/key-store extension points.
+7. Complete canonical JSON and adversarial-test decisions.
+8. Specify public context binding and optional keyed suites without changing v1.
+9. Complete packaging and operational guidance, then begin Guyabano adoption.
 
-Implement in `Penghou.Siming`:
-
-- [ ] immutable and allocation-safe `LedgerHash` and `LedgerId` value types;
-- [ ] raw payload and typed append request contracts;
-- [ ] `ILedgerPayloadSerializer` and `SerializedLedgerPayload`;
-- [ ] canonical JSON serializer and golden-vector tests;
-- [ ] v1 binary envelope encoder and SHA-256 row hasher;
-- [ ] detailed full-chain and checkpoint verification;
-- [ ] an in-memory ledger primarily for provider conformance tests.
-
-Adversarial tests must cover payload, event type, timestamp, stream, previous
-hash, row hash, sequence, ledger ID and serializer descriptor mutation; deletion,
-insertion, reordering and truncation; rewritten suffixes; culture changes;
-equivalent JSON; invalid encoding; and unsupported versions.
-
-Exit criterion: cryptographic semantics are proven without SQLite.
-
-### Milestone 2 — SQLite append and query path
-
-Implement in `Penghou.Siming.Sqlite`:
-
-- [ ] add `Microsoft.Data.Sqlite`;
-- [ ] immutable one-row metadata table and ledger-entry table;
-- [x] schema initialization and compatibility validation;
-- [ ] atomic append using a SQLite write transaction such as `BEGIN IMMEDIATE`;
-- [ ] transactionally allocate the next sequence and read the previous head;
-- [ ] hash the exact bytes inserted into the database;
-- [ ] `UPDATE` and `DELETE` rejection triggers;
-- [ ] ordered/paged reads and stream filtering;
-- [x] reopen, empty-head, rollback, cancellation, and schema tests.
-
-Exit criterion: a single process can safely create, append, reopen, page, and
-verify a durable ledger.
-
-### Milestone 3 — Concurrency and crash recovery
-
-- [ ] concurrent callers never allocate the same sequence or previous head;
-- [ ] multiple processes serialize commits correctly;
-- [x] busy timeout and cancellation behavior is deterministic;
-- [ ] WAL recovery exposes no partial logical entry;
-- [ ] interrupted initialization is recoverable;
-- [ ] direct SQL corruption produces precise verification failures;
-- [ ] tail truncation and older database restoration fail against checkpoints;
-- [ ] add reusable backend conformance tests.
-
-Exit criterion: Siming remains valid under realistic embedded failure and
-contention modes. Guyabano adoption should not start before this milestone.
-
-### Milestone 4 — Checkpoints and operations
-
-- [ ] portable deterministic checkpoint serialization;
-- [ ] exact-head and valid-extension verification;
-- [ ] optional signed-checkpoint contracts without core key management;
-- [ ] bounded verification progress and cancellation;
-- [ ] Git trailer/note anchoring sample or adapter;
-- [ ] consider a small independent verifier CLI after contracts stabilize.
-
-Exit criterion: a ledger can be checked against independently retained trust
-state and used operationally without application-specific code.
-
-### Milestone 5 — Package readiness
+## Package readiness
 
 - [ ] public API baselines and compatibility policy;
 - [ ] XML documentation and examples;
@@ -313,7 +277,7 @@ state and used operationally without application-specific code.
 Exit criterion: Siming is independently usable rather than merely extracted
 Guyabano code.
 
-### Milestone 6 — Guyabano dogfooding and reduction
+## Guyabano dogfooding and reduction
 
 Create `Guyabano.Session.Sqlite` as the domain adapter.
 
@@ -396,42 +360,35 @@ measurements demonstrate a real need.
 
 ## Open decisions
 
-Resolve these during Milestone 0:
-
-1. Does v1 implement RFC 8785 exactly, or preserve Guyabano's current canonical
-   JSON v2 rules and name/version that contract explicitly?
-2. Are `ContentType`, `SerializationFormat`, and `SerializationVersion`
-   sufficient, or does the row also commit optional application `Schema` and
-   `SchemaVersion` fields?
-3. Should `LedgerHash` equality be fixed-time everywhere or only in verification
-   and checkpoint comparison paths?
-4. What deterministic checkpoint serialization format should be portable across
-   languages?
-5. Which .NET target frameworks ship in the first preview: .NET 8 only, or .NET
-   8 and .NET 10 like other Penghou packages?
-6. Where will Guyabano retain its first independent trusted checkpoint: Git
-   trailer, Git note, separate file, or more than one location?
-7. What payload classification and retention policy must Guyabano enforce before
-   prompts or model outputs may be committed immutably?
+1. RFC 8785 exactly versus a named Penghou canonical JSON contract compatible
+   with Guyabano artifact hash `v2`.
+2. Application schema identity/version in a future envelope.
+3. Exact public ledger-context schema and lifecycle.
+4. Whether keyed hashing belongs in core or the cryptography package.
+5. Key rotation semantics: new ledger epoch, suite transition event, or both.
+6. Supported target frameworks for the first preview.
+7. First independent Guyabano checkpoint location: Git trailer, Git note,
+   separate file, or multiple anchors.
+8. Guyabano payload classification and retention policy for prompts, model
+   responses, tool output, and generated content.
 
 ## Current repository state
 
-- The repository, solution, core package, SQLite package and two test projects
-  are scaffolded.
-- Initial ledger contracts and SQLite options exist but are explicitly
-  pre-release and not frozen.
+- The repository contains the core, SQLite, cryptography, testing, verifier CLI,
+  and test projects. Public APIs remain pre-release.
 - The core supports raw definitive bytes and typed append requests through an
   injected serializer. Canonical JSON, the v1 binary encoder/hasher, an in-memory
   provider, checkpoint-aware verification, and the first golden vector are
   implemented.
-- The first SQLite provider now has immutable metadata/entry tables, WAL setup,
+- The SQLite provider has immutable metadata/entry tables, WAL setup,
   immediate transactional appends, ordered and paged reads, stream filtering,
   update/delete rejection triggers, reopen verification, and separate-instance
   concurrency coverage. It also has explicit compatibility errors, injected
   rollback/cancellation tests at each append boundary, killed-process WAL
   recovery, true multi-process contention, deterministic busy-timeout behavior,
   and declared type/nullability/key schema compatibility coverage.
-- The full suite passes 36 tests (21 core and 15 SQLite), and the independent
+- The full suite passes 42 tests (24 core and 18 SQLite), and the independent
   Python verifier reproduces the v1 golden hash.
-- The repository is initialized locally but has not yet been committed or
-  connected to the GitHub remote.
+- Portable and signed checkpoints, bounded verification, progress,
+  cancellation, and the operational verifier CLI are implemented.
+- The repository is committed and connected to its GitHub remote.

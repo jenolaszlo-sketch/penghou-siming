@@ -91,11 +91,8 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
 
     public async ValueTask<LedgerVerificationResult> VerifyAsync(LedgerCheckpoint? checkpoint = null, CancellationToken cancellationToken = default)
     {
-        LedgerEntry[] snapshot;
-        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try { snapshot = entries.ToArray(); }
-        finally { gate.Release(); }
-        return LedgerVerifier.Verify(LedgerId, snapshot, checkpoint);
+        return await LedgerVerifier.VerifyAsync(
+            this, checkpoint, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     public ValueTask DisposeAsync() { gate.Dispose(); return ValueTask.CompletedTask; }

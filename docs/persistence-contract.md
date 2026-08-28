@@ -1,7 +1,6 @@
 # Persistence contract
 
-This document records the implemented v1 core boundary. SQLite persistence is
-not implemented yet.
+This document records the implemented v1 core and SQLite persistence boundary.
 
 ## Authority
 
@@ -11,7 +10,7 @@ verification follows the global chain or a trusted global checkpoint.
 
 ## Hash input
 
-Each row hash will commit to a versioned, unambiguous binary envelope containing:
+Each row hash commits to a versioned, unambiguous binary envelope containing:
 
 1. format version;
 2. immutable ledger ID;
@@ -42,10 +41,15 @@ f31470fc756cc7e09a8f87eeb93643f4586f572487d18524adafe88b6318c9e9
 
 ## SQLite responsibilities
 
-The SQLite backend will atomically read the head, allocate the next sequence,
+The SQLite backend atomically reads the head, allocates the next sequence,
 calculate the hash from the bytes being persisted, insert the row, and commit.
 Failed or cancelled transactions expose no partial logical event. Triggers reject
 ordinary updates and deletes.
+
+The v1 suite is unkeyed SHA-256 and has no external-context field. Future public
+context binding or keyed suites require a new format or ledger epoch and never
+reinterpret v1 rows. A keyed suite stores only its algorithm identity and key
+identifier; secret material remains external.
 
 ## Verification limits
 

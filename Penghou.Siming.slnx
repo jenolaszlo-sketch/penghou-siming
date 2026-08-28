@@ -1,7 +1,9 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Penghou.Siming.Cryptography/Penghou.Siming.Cryptography.csproj" />
     <Project Path="src/Penghou.Siming.Sqlite/Penghou.Siming.Sqlite.csproj" />
     <Project Path="src/Penghou.Siming.Testing/Penghou.Siming.Testing.csproj" />
+    <Project Path="src/Penghou.Siming.Verify/Penghou.Siming.Verify.csproj" />
     <Project Path="src/Penghou.Siming/Penghou.Siming.csproj" />
   </Folder>
   <Folder Name="/tests/">

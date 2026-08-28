@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\Penghou.Siming\Penghou.Siming.csproj" />
     <ProjectReference Include="..\..\src\Penghou.Siming.Sqlite\Penghou.Siming.Sqlite.csproj" />
     <ProjectReference Include="..\..\src\Penghou.Siming.Testing\Penghou.Siming.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Penghou.Siming.Verify\Penghou.Siming.Verify.csproj" />
     <ProjectReference Include="..\Penghou.Siming.Sqlite.TestHost\Penghou.Siming.Sqlite.TestHost.csproj" />
   </ItemGroup>
 

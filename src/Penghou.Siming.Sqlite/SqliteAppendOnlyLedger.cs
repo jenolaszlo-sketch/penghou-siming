@@ -250,23 +250,8 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         LedgerCheckpoint? checkpoint = null,
         CancellationToken cancellationToken = default)
     {
-        var entries = new List<LedgerEntry>();
-        long after = 0;
-        while (true)
-        {
-            var page = new List<LedgerEntry>();
-            await foreach (var entry in ReadAsync(
-                               new LedgerReadRequest(
-                                   AfterSequence: after,
-                                   Limit: LedgerReadRequest.MaximumLimit),
-                               cancellationToken).ConfigureAwait(false))
-                page.Add(entry);
-            if (page.Count == 0)
-                break;
-            entries.AddRange(page);
-            after = page[^1].Sequence;
-        }
-        return LedgerVerifier.Verify(ledgerId, entries, checkpoint);
+        return await LedgerVerifier.VerifyAsync(
+            this, checkpoint, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask EnsureInitializedAsync(

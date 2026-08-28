@@ -1,6 +1,6 @@
 namespace Penghou.Siming;
 
-public static class LedgerVerifier
+public static partial class LedgerVerifier
 {
     public static LedgerVerificationResult Verify(LedgerId ledgerId, IReadOnlyList<LedgerEntry> entries, LedgerCheckpoint? checkpoint = null)
     {
