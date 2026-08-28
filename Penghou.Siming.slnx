@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Penghou.Siming.Sqlite/Penghou.Siming.Sqlite.csproj" />
+    <Project Path="src/Penghou.Siming.Testing/Penghou.Siming.Testing.csproj" />
+    <Project Path="src/Penghou.Siming/Penghou.Siming.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Penghou.Siming.Sqlite.TestHost/Penghou.Siming.Sqlite.TestHost.csproj" />
+    <Project Path="tests/Penghou.Siming.Sqlite.Tests/Penghou.Siming.Sqlite.Tests.csproj" />
+    <Project Path="tests/Penghou.Siming.Tests/Penghou.Siming.Tests.csproj" />
+  </Folder>
+</Solution>

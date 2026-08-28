@@ -1,0 +1,15 @@
+{
+  "formatVersion": 1,
+  "genesisText": "penghou-siming-ledger-v1",
+  "ledgerId": "00112233-4455-6677-8899-aabbccddeeff",
+  "sequence": 1,
+  "committedAtUnixMilliseconds": 1700000000123,
+  "streamId": "session-1",
+  "eventType": "SessionStarted",
+  "contentType": "application/json",
+  "serializationFormat": "penghou-canonical-json",
+  "serializationVersion": 1,
+  "payloadUtf8": "{\"name\":\"demo\"}",
+  "idempotencyKey": null,
+  "expectedHashHex": "f31470fc756cc7e09a8f87eeb93643f4586f572487d18524adafe88b6318c9e9"
+}
