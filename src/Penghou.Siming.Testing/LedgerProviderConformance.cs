@@ -34,19 +34,45 @@ public static class LedgerProviderConformance
                     new byte[] { 1 },
                     IdempotencyKey: "conformance:first"),
                 cancellationToken).ConfigureAwait(false);
+            var firstHead = await ledger.GetHeadAsync(cancellationToken).ConfigureAwait(false);
             var second = await ledger.AppendAsync(
-                new LedgerAppendRequest("stream-b", "two", new byte[] { 2 }),
+                new LedgerAppendRequest(
+                    "stream-b",
+                    "two",
+                    new byte[] { 2 },
+                    ExpectedHead: firstHead),
                 cancellationToken).ConfigureAwait(false);
             Require(first.Sequence == 1 && second.Sequence == 2, "global sequence");
             Require(second.PreviousHash == first.Hash, "hash continuity");
             checks.Add("global-chain");
+
+            try
+            {
+                await ledger.AppendAsync(
+                    new LedgerAppendRequest(
+                        "stream-c",
+                        "stale",
+                        new byte[] { 3 },
+                        ExpectedHead: firstHead),
+                    cancellationToken).ConfigureAwait(false);
+                throw new InvalidOperationException(
+                    "Ledger provider accepted an append against a stale head.");
+            }
+            catch (LedgerHeadConflictException conflict)
+            {
+                Require(conflict.ExpectedHead == firstHead, "expected-head conflict expectation");
+                Require(conflict.ActualHead.Sequence == second.Sequence &&
+                    conflict.ActualHead.Hash == second.Hash, "expected-head conflict observation");
+            }
+            checks.Add("conditional-append");
 
             var replay = await ledger.AppendAsync(
                 new LedgerAppendRequest(
                     "stream-a",
                     "one",
                     new byte[] { 1 },
-                    IdempotencyKey: "conformance:first"),
+                    IdempotencyKey: "conformance:first",
+                    ExpectedHead: firstHead),
                 cancellationToken).ConfigureAwait(false);
             Require(replay.Sequence == first.Sequence && replay.Hash == first.Hash, "idempotent replay");
             var found = await ledger.ReadByIdempotencyKeyAsync(

@@ -203,6 +203,19 @@ the original CLR types.
   transaction plus a filtered unique index; future providers must pass the same
   conformance check.
 
+### Conditional append
+
+- Append requests may also carry an optional exact `LedgerHead` expectation.
+  This is optimistic concurrency and remains independent of idempotency.
+- Providers compare ledger identity, sequence, format, and head hash inside the
+  append lock or transaction. A mismatch throws `LedgerHeadConflictException`
+  containing both the expected and atomically observed heads.
+- Idempotent replay is resolved first. An identical retry returns its original
+  committed entry even when the supplied expected head has since become stale.
+- A failed conditional append never advances the sequence. Shared provider
+  conformance verifies successful conditional append, stale rejection, typed
+  diagnostics, and retry precedence.
+
 ### Security and trust
 
 Siming is tamper-evident, not tamper-proof.

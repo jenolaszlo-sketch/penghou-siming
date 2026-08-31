@@ -29,14 +29,14 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
     public ValueTask<LedgerEntry> AppendAsync<T>(LedgerAppendRequest<T> request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return AppendSerializedAsync(request.StreamId, request.EventType, serializer.Serialize(request.Payload), request.IdempotencyKey, cancellationToken);
+        return AppendSerializedAsync(request.StreamId, request.EventType, serializer.Serialize(request.Payload), request.IdempotencyKey, request.ExpectedHead, cancellationToken);
     }
 
     /// <inheritdoc />
     public ValueTask<LedgerEntry> AppendAsync(LedgerAppendRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return AppendSerializedAsync(request.StreamId, request.EventType, new SerializedLedgerPayload(request.Payload, request.ContentType, request.SerializationFormat, request.SerializationVersion), request.IdempotencyKey, cancellationToken);
+        return AppendSerializedAsync(request.StreamId, request.EventType, new SerializedLedgerPayload(request.Payload, request.ContentType, request.SerializationFormat, request.SerializationVersion), request.IdempotencyKey, request.ExpectedHead, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -51,7 +51,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
         finally { gate.Release(); }
     }
 
-    private async ValueTask<LedgerEntry> AppendSerializedAsync(string streamId, string eventType, SerializedLedgerPayload payload, string? idempotencyKey, CancellationToken cancellationToken)
+    private async ValueTask<LedgerEntry> AppendSerializedAsync(string streamId, string eventType, SerializedLedgerPayload payload, string? idempotencyKey, LedgerHead? expectedHead, CancellationToken cancellationToken)
     {
         inputLimits.ValidateAppend(streamId, eventType, payload, idempotencyKey);
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -63,6 +63,11 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
                     throw new LedgerIdempotencyConflictException(idempotencyKey);
                 return existing;
             }
+            var actualHead = entries.Count == 0
+                ? new LedgerHead(LedgerId, 0, LedgerFormatV1.GenesisHash, LedgerFormatV1.Version)
+                : new LedgerHead(LedgerId, entries[^1].Sequence, entries[^1].Hash, LedgerFormatV1.Version);
+            if (expectedHead is not null && expectedHead != actualHead)
+                throw new LedgerHeadConflictException(expectedHead, actualHead);
             var sequence = entries.Count + 1L;
             var previous = entries.Count == 0 ? LedgerFormatV1.GenesisHash : entries[^1].Hash;
             var committedAt = DateTimeOffset.FromUnixTimeMilliseconds(

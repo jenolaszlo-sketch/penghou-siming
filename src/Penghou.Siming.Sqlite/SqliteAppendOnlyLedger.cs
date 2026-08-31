@@ -52,6 +52,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             request.EventType,
             serializer.Serialize(request.Payload),
             request.IdempotencyKey,
+            request.ExpectedHead,
             cancellationToken);
     }
 
@@ -70,6 +71,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
                 request.SerializationFormat,
                 request.SerializationVersion),
             request.IdempotencyKey,
+            request.ExpectedHead,
             cancellationToken);
     }
 
@@ -95,6 +97,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         string eventType,
         SerializedLedgerPayload payload,
         string? idempotencyKey,
+        LedgerHead? expectedHead,
         CancellationToken cancellationToken)
     {
         if (options.OpenMode == SimingSqliteOpenMode.ReadOnly)
@@ -125,6 +128,10 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             connection,
             transaction,
             cancellationToken).ConfigureAwait(false);
+        var actualHead = new LedgerHead(
+            ledgerId, sequence, previous, LedgerFormatV1.Version);
+        if (expectedHead is not null && expectedHead != actualHead)
+            throw new LedgerHeadConflictException(expectedHead, actualHead);
         await InjectAsync(
             SqliteAppendFaultPoint.AfterHeadRead,
             cancellationToken).ConfigureAwait(false);

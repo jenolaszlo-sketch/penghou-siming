@@ -13,7 +13,7 @@ public sealed class ProviderConformanceTests
 
         Assert.True(result.Passed, result.Failure);
         Assert.Equal([
-            "empty-head", "global-chain", "idempotency", "queries",
+            "empty-head", "global-chain", "conditional-append", "idempotency", "queries",
             "bounded-verification", "verification-cancellation"
         ], result.Checks);
     }

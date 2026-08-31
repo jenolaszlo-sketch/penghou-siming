@@ -49,6 +49,9 @@ be finalized before the first preview release.
 - Optional idempotency keys are globally unique per ledger, cryptographically
   committed, atomically deduplicated, and directly queryable by every conforming
   provider.
+- Optional expected-head appends provide atomic optimistic concurrency. An
+  identical idempotent retry still resolves to its original entry before the
+  head condition is evaluated.
 - Sensitive payload retention is a caller policy. Applications should prefer
   bounded provenance and content identities over raw secrets or model payloads.
 - Append inputs are bounded before persistence. Defaults are conservative and
