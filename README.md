@@ -78,9 +78,15 @@ var verification = await LedgerVerifier.VerifyAsync(
     cancellationToken);
 ```
 
-Typed payloads can use `CanonicalJsonPayloadSerializer`; its named canonical
-JSON contract is compatible with Guyabano artifact hash `v2` and is protected by
-portable JSON/hash vectors. Configure stricter append limits when appropriate:
+Typed payloads can use `CanonicalJsonPayloadSerializer` (the historical v1
+contract) or `CanonicalJsonPayloadSerializerV2`. The v2 contract rejects
+duplicate object names and canonicalizes number tokens without a lossy
+`double`/`decimal` conversion. Both are named contracts protected by portable
+JSON/hash vectors; existing v1 rows and Guyabano hashes are never
+reinterpreted. Its `ComputeSha256` and `VerifySha256` helpers derive logical
+identity from either a `JsonElement` or persisted UTF-8 JSON. Exact envelope or
+file-byte integrity remains a separate hash. Configure stricter append limits
+when appropriate:
 
 ```csharp
 var options = new SimingSqliteOptions
@@ -130,19 +136,19 @@ behavioral conformance suite.
 ## Build and publish
 
 CI builds, checks formatting, runs all .NET tests, independently reproduces the
-v1 golden vector in Python, then restores, builds, and vulnerability-audits an
+v1 ledger and v2 canonical-JSON vectors in Python, then restores, builds, and vulnerability-audits an
 isolated consumer from the packed artifacts before uploading `.nupkg` and
 `.snupkg` files.
 
 Publishing follows the Baize workflow. Configure NuGet trusted publishing for
 this GitHub repository and workflow, then add the NuGet account name as the
 `NUGET_USER` repository secret. Either dispatch **Publish to NuGet** manually or
-push a version tag; a tag such as `v0.1.0-preview.2` becomes package version
-`0.1.0-preview.2`.
+push a version tag; a tag such as `v0.1.0-preview.4` becomes package version
+`0.1.0-preview.4`.
 
 ```powershell
-git tag v0.1.0-preview.2
-git push origin v0.1.0-preview.2
+git tag v0.1.0-preview.4
+git push origin v0.1.0-preview.4
 ```
 
 The API remains pre-release and may change before the first package release.

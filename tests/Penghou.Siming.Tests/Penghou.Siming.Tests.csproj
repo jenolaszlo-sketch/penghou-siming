@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <None Include="..\..\vectors\guyabano-canonical-json-v2.json" Link="vectors\guyabano-canonical-json-v2.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\vectors\penghou-canonical-json-v2.json" Link="vectors\penghou-canonical-json-v2.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -16,6 +16,12 @@ decisions live in the [implementation plan](implementation-plan.md) and
 
 ## Priority 2 — Complete and evolve the cryptographic contract
 
+- [x] Add the separately versioned Penghou canonical JSON v2 serializer with
+  duplicate-property rejection, source-token number normalization, bounded
+  exponent/output work, and adversarial/golden coverage. Preserve v1 without
+  reinterpretation; downstream logical-content adapters must wait for the v2
+  package release.
+
 - [ ] Complete adversarial coverage for every committed field, malformed
   encoding, insertion, deletion, reordering, truncation, replacement chains,
   culture, and unsupported versions.

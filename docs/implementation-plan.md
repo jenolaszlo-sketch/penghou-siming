@@ -123,8 +123,13 @@ definitive.
 Canonical JSON is a convenience serializer and a reusable logical-content
 identity tool, not a requirement for every ledger payload.
 
-Siming uses a named Penghou canonical JSON contract rather than claiming RFC
-8785 compliance. It matches Guyabano artifact hash contract `v2` and covers:
+Siming uses named Penghou canonical JSON contracts rather than claiming RFC
+8785 compliance. `CanonicalJsonPayloadSerializer` is the historical v1
+contract, remains byte-for-byte unchanged, and retains compatibility with the
+existing Guyabano artifact hash contract `v2` vectors.
+`CanonicalJsonPayloadSerializerV2` is a separately versioned, stricter contract
+for new logical-content identities; it does not reinterpret or claim byte
+compatibility with the earlier contracts. It covers:
 
 - ordinal property ordering;
 - preserved array order;
@@ -133,10 +138,31 @@ Siming uses a named Penghou canonical JSON contract rather than claiming RFC
 - deterministic number representation;
 - explicit null, boolean, string, array, and object handling.
 
+The v2 contract rejects duplicate object names recursively. Numbers are read
+from their original JSON token, with exact digit and exponent normalization;
+they are never converted through `double` or `decimal`. Negative and positive
+zero both become `0`. Values in the range `1e-6 <= |value| < 1e21` use fixed
+notation; other values use scientific notation with an uppercase `E` and a
+signed, at-least-two-digit exponent. Number tokens and emitted numbers are
+bounded to one million characters, and an exponent is bounded to 128 digits.
+These limits are part of the v2 parser safety contract, not an interpretation
+of v1 data.
+
+Strings use `Utf8JsonWriter`'s default encoder as a committed part of the v2
+contract: property delimiters remain JSON quotes, embedded quotes and
+HTML-sensitive characters use uppercase `\\uXXXX` escapes, the standard short
+control escapes are retained, `/` is not escaped, and non-Basic-Latin scalar
+values use uppercase UTF-16 `\\uXXXX` escape units. The portable vectors lock
+this behavior independently of the CLR serializer.
+
+`ComputeSha256` and `VerifySha256` calculate and compare the named v2 logical
+identity from a `JsonElement` or persisted UTF-8 JSON. They do not replace the
+separate SHA-256 of exact immutable envelope or file bytes.
+
 Portable golden vectors contain input JSON, expected canonical JSON, and an
 independently reproducible SHA-256 value. They lock compatibility before
-Guyabano deletes its local canonicalizer. Existing Guyabano hashes must never be
-reinterpreted.
+Guyabano deletes its local canonicalizer. Existing Guyabano and Siming v1
+hashes must never be reinterpreted.
 
 ### Input limits
 
@@ -405,8 +431,8 @@ measurements demonstrate a real need.
   recovery, true multi-process contention, deterministic busy-timeout behavior,
   strict read-only operation, stable verification snapshots, and schema-object
   compatibility coverage.
-- The full suite passes 51 tests (26 core and 25 SQLite), and the independent
-  Python verifier reproduces the v1 golden hash.
+- The full suite passes 59 tests (34 core and 25 SQLite), and the independent
+  Python verifier reproduces the v1 ledger hash and v2 canonical JSON vectors.
 - Canonical JSON is cross-checked against portable Guyabano `v2` compatibility
   vectors, including exponent, negative-zero, escaping, and property ordering.
 - Provider-neutral append limits cover payload and UTF-8 metadata sizes before
