@@ -1,5 +1,8 @@
 # Penghou.Siming
 
+[![CI](https://github.com/jenolaszlo-sketch/penghou-siming/actions/workflows/ci.yml/badge.svg)](https://github.com/jenolaszlo-sketch/penghou-siming/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/jenolaszlo-sketch/penghou-siming)](LICENSE)
+
 Penghou.Siming is a small, embedded, tamper-evident event ledger for .NET.
 It combines a versioned cryptographic hash-chain format with transactional
 SQLite persistence for local-first audit and provenance workloads.
@@ -60,7 +63,7 @@ be finalized before the first preview release.
   ledger-context binding from optional externally keyed hashing; neither will
   reinterpret v1 history or replace trusted checkpoints.
 
-## Planned usage
+## Quick start
 
 ```csharp
 IAppendOnlyLedger ledger = /* Penghou.Siming.Sqlite */;
@@ -153,6 +156,15 @@ git push origin v0.1.0-preview.4
 
 The API remains pre-release and may change before the first package release.
 
+## Current status
+
+The current package line is `0.1.0-preview.4` on .NET 8. The in-memory and
+SQLite ledgers, provider conformance suite, canonical JSON v1 and v2 identities,
+expected-head appends, bounded verification, detached Ed25519 checkpoints, and
+verification CLI are implemented. Public API baselines, expanded platform CI,
+Native AOT review, operational guidance, and Guyabano adoption remain roadmap
+work.
+
 ## Repository layout
 
 ```text
@@ -169,3 +181,9 @@ docs
 Start with the [implementation plan](docs/implementation-plan.md), then see the
 [unfinished roadmap](docs/roadmap.md) and
 [persistence contract](docs/persistence-contract.md).
+
+## License
+
+Apache-2.0
+
+Copyright (c) 2026 Jenő Konrád László
