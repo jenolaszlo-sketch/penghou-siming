@@ -1,12 +1,13 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Penghou.Siming.Cryptography;
 using Penghou.Siming.Sqlite;
 
 namespace Penghou.Siming.Verify;
 
 /// <summary>Command-line entry point for operational ledger verification.</summary>
-public static class Program
+public static partial class Program
 {
     /// <summary>Runs the verifier with console input/output and Ctrl+C cancellation.</summary>
     public static async Task<int> Main(string[] args)
@@ -140,12 +141,7 @@ public static class Program
                 keyFingerprint = verifier.Fingerprint;
                 if (!SignedLedgerCheckpoints.Verify(signed, verifier, context, hmacKey, out checkpoint))
                 {
-                    await WriteResultAsync(output, new
-                    {
-                        valid = false,
-                        failure = "InvalidCheckpointSignature",
-                        keyFingerprint
-                    }).ConfigureAwait(false);
+                    await WriteSignatureFailureAsync(output, keyFingerprint).ConfigureAwait(false);
                     return 1;
                 }
             }
@@ -162,18 +158,16 @@ public static class Program
             var result = await ledger.VerifyAsync(
                 checkpoint, new LedgerVerificationOptions(pageSize, progress),
                 cancellationToken).ConfigureAwait(false);
-            await WriteResultAsync(output, new
-            {
-                valid = result.IsValid,
-                verifiedEntries = result.VerifiedEntries,
-                ledgerId = result.VerifiedHead.LedgerId.Value,
-                sequence = result.VerifiedHead.Sequence,
-                headHash = result.VerifiedHead.Hash.ToString(),
-                failure = result.Failure?.ToString(),
-                failedSequence = result.FailedSequence,
-                detail = result.Detail,
-                keyFingerprint
-            }).ConfigureAwait(false);
+            await WriteResultAsync(output, new VerifyOutput(
+                result.IsValid,
+                result.VerifiedEntries,
+                result.VerifiedHead.LedgerId.Value,
+                result.VerifiedHead.Sequence,
+                result.VerifiedHead.Hash.ToString(),
+                result.Failure?.ToString(),
+                result.FailedSequence,
+                result.Detail,
+                keyFingerprint)).ConfigureAwait(false);
             return result.IsValid ? 0 : 1;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -194,11 +188,10 @@ public static class Program
         }
     }
 
-    private static async Task WriteErrorAsync(TextWriter error, string detail) =>
-        await error.WriteLineAsync(JsonSerializer.Serialize(
-            new { valid = false, failure = "InvalidInput", detail },
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }))
-            .ConfigureAwait(false);
+    private static Task WriteErrorAsync(TextWriter error, string detail) =>
+        error.WriteLineAsync(JsonSerializer.Serialize(
+            new VerifyInputError(false, "InvalidInput", detail),
+            VerifyJsonContext.Default.VerifyInputError));
 
     private static async Task<byte[]> ReadBoundedAsync(
         string path, int maximumBytes, string kind, CancellationToken cancellationToken)
@@ -210,10 +203,14 @@ public static class Program
         return await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task WriteResultAsync(TextWriter output, object value) =>
-        await output.WriteLineAsync(JsonSerializer.Serialize(value,
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }))
-            .ConfigureAwait(false);
+    private static Task WriteResultAsync(TextWriter output, VerifyOutput value) =>
+        output.WriteLineAsync(JsonSerializer.Serialize(
+            value, VerifyJsonContext.Default.VerifyOutput));
+
+    private static Task WriteSignatureFailureAsync(TextWriter output, string? keyFingerprint) =>
+        output.WriteLineAsync(JsonSerializer.Serialize(
+            new VerifySignatureFailure(false, "InvalidCheckpointSignature", keyFingerprint),
+            VerifyJsonContext.Default.VerifySignatureFailure));
 
     private sealed class TextProgress(TextWriter writer) :
         IProgress<LedgerVerificationProgress>
@@ -221,6 +218,33 @@ public static class Program
         public void Report(LedgerVerificationProgress value) => writer.WriteLine(
             $"Verified {value.VerifiedEntries}/{value.TargetEntries} entries ({value.VerifiedHash}).");
     }
+
+    private sealed record VerifyOutput(
+        bool Valid,
+        long VerifiedEntries,
+        Guid LedgerId,
+        long Sequence,
+        string HeadHash,
+        string? Failure,
+        long? FailedSequence,
+        string? Detail,
+        string? KeyFingerprint);
+
+    private sealed record VerifySignatureFailure(
+        bool Valid,
+        string Failure,
+        string? KeyFingerprint);
+
+    private sealed record VerifyInputError(
+        bool Valid,
+        string Failure,
+        string Detail);
+
+    [JsonSerializable(typeof(VerifyOutput))]
+    [JsonSerializable(typeof(VerifySignatureFailure))]
+    [JsonSerializable(typeof(VerifyInputError))]
+    [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    private sealed partial class VerifyJsonContext : JsonSerializerContext;
 
     private const string Usage = """
         Usage: penghou-siming-verify <database> [options]

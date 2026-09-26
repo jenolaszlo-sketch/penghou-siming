@@ -62,9 +62,11 @@ override Penghou.Siming.SerializedLedgerPayload.ToString() -> string!
 Penghou.Siming.CanonicalJsonPayloadSerializer
 Penghou.Siming.CanonicalJsonPayloadSerializer.CanonicalJsonPayloadSerializer(System.Text.Json.JsonSerializerOptions? serializerOptions = null) -> void
 Penghou.Siming.CanonicalJsonPayloadSerializer.Serialize<T>(T payload) -> Penghou.Siming.SerializedLedgerPayload!
+Penghou.Siming.CanonicalJsonPayloadSerializer.Serialize<T>(T payload, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>! jsonTypeInfo) -> Penghou.Siming.SerializedLedgerPayload!
 Penghou.Siming.CanonicalJsonPayloadSerializerV2
 Penghou.Siming.CanonicalJsonPayloadSerializerV2.CanonicalJsonPayloadSerializerV2(System.Text.Json.JsonSerializerOptions? serializerOptions = null) -> void
 Penghou.Siming.CanonicalJsonPayloadSerializerV2.Serialize<T>(T payload) -> Penghou.Siming.SerializedLedgerPayload!
+Penghou.Siming.CanonicalJsonPayloadSerializerV2.Serialize<T>(T payload, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>! jsonTypeInfo) -> Penghou.Siming.SerializedLedgerPayload!
 Penghou.Siming.IAppendOnlyLedger
 Penghou.Siming.IAppendOnlyLedger.AppendAsync(Penghou.Siming.LedgerAppendRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerEntry!>
 Penghou.Siming.IAppendOnlyLedger.GetHeadAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerHead!>

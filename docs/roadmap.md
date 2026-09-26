@@ -67,7 +67,10 @@ decisions live in the [implementation plan](implementation-plan.md) and
   baselines. (CI matrix: Ubuntu, Windows, macOS; package validation,
   packed-consumer restore audit, and PublicApiAnalyzers baselines enforced
   everywhere.)
-- [ ] Review trimming, Native AOT, and supported target frameworks.
+- [x] Review trimming, Native AOT, and supported target frameworks
+  (`docs/trimming-and-aot.md`: net8.0-only decision, zero-warning trimmed
+  publish, `JsonTypeInfo<T>` serializer overloads, source-generated CLI JSON,
+  and AOT analysis status).
 - [ ] Benchmark append, pagination, verification, and large payloads.
 - [ ] Publish threat-model, retention, backup, signing-key, and checkpoint
   operational guidance.

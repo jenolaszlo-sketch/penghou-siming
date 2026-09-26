@@ -48,6 +48,8 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
     public LedgerContext? Context => ledgerContext;
 
     /// <inheritdoc />
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Serializing the payload type may require members that cannot be statically analyzed. Pre-serialize to bytes and use AppendAsync(LedgerAppendRequest) for trimmed or Native AOT applications.")]
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Serializing the payload type may require dynamic code generation. Pre-serialize to bytes and use AppendAsync(LedgerAppendRequest) for trimmed or Native AOT applications.")]
     public ValueTask<LedgerEntry> AppendAsync<T>(LedgerAppendRequest<T> request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);

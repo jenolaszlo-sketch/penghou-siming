@@ -1,6 +1,8 @@
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Penghou.Siming;
 
@@ -15,7 +17,12 @@ public sealed class CanonicalJsonPayloadSerializer(JsonSerializerOptions? serial
     private readonly JsonSerializerOptions options = serializerOptions is null ? new(JsonSerializerDefaults.Web) : new(serializerOptions);
 
     /// <inheritdoc />
+    [RequiresUnreferencedCode("Serializing the payload type may require members that cannot be statically analyzed. Use the JsonTypeInfo<T> overload for trimmed or Native AOT applications.")]
+    [RequiresDynamicCode("Serializing the payload type may require dynamic code generation. Use the JsonTypeInfo<T> overload for trimmed or Native AOT applications.")]
     public SerializedLedgerPayload Serialize<T>(T payload) => new(Canonicalize(JsonSerializer.SerializeToElement(payload, options)), "application/json", Format, Version);
+
+    /// <summary>Serializes one payload with source-generated metadata without persisting it.</summary>
+    public SerializedLedgerPayload Serialize<T>(T payload, JsonTypeInfo<T> jsonTypeInfo) => new(Canonicalize(JsonSerializer.SerializeToElement(payload, jsonTypeInfo)), "application/json", Format, Version);
 
     /// <summary>Produces deterministic UTF-8 JSON bytes from a JSON tree.</summary>
     public static ReadOnlyMemory<byte> Canonicalize(JsonElement element)

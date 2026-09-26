@@ -1,10 +1,11 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Security.Cryptography;
 
 namespace Penghou.Siming.Tests;
 
-public sealed class CanonicalJsonPayloadSerializerTests
+public sealed partial class CanonicalJsonPayloadSerializerTests
 {
     [Fact]
     public void Canonicalize_IgnoresObjectOrderWhitespaceAndNumberSpelling()
@@ -147,4 +148,27 @@ public sealed class CanonicalJsonPayloadSerializerTests
     }
 
     private sealed record CanonicalVector(string Name, string InputJson, string CanonicalJson, string Sha256);
+
+    [Fact]
+    public void Serialize_WithSourceGeneratedMetadata_MatchesDefaultContract()
+    {
+        var value = new SampleValue(42);
+
+        var v1Expected = new CanonicalJsonPayloadSerializer().Serialize(value);
+        var v1Actual = new CanonicalJsonPayloadSerializer().Serialize(
+            value, SampleJsonContext.Default.SampleValue);
+        var v2Expected = new CanonicalJsonPayloadSerializerV2().Serialize(value);
+        var v2Actual = new CanonicalJsonPayloadSerializerV2().Serialize(
+            value, SampleJsonContext.Default.SampleValue);
+
+        Assert.Equal(v1Expected.Bytes.ToArray(), v1Actual.Bytes.ToArray());
+        Assert.Equal(v2Expected.Bytes.ToArray(), v2Actual.Bytes.ToArray());
+        Assert.Equal("{\"value\":42}", Encoding.UTF8.GetString(v2Actual.Bytes.Span));
+    }
+
+    internal sealed record SampleValue(int Value);
+
+    [JsonSerializable(typeof(SampleValue))]
+    [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    internal sealed partial class SampleJsonContext : JsonSerializerContext;
 }

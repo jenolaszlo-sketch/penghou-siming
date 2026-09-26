@@ -10,6 +10,8 @@ public sealed record SerializedLedgerPayload(ReadOnlyMemory<byte> Bytes, string 
 public interface ILedgerPayloadSerializer
 {
     /// <summary>Serializes one payload without persisting it.</summary>
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Serializing the payload type may require members that cannot be statically analyzed. Use a JsonTypeInfo<T> overload for trimmed or Native AOT applications.")]
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Serializing the payload type may require dynamic code generation. Use a JsonTypeInfo<T> overload for trimmed or Native AOT applications.")]
     SerializedLedgerPayload Serialize<T>(T payload);
 }
 /// <summary>Requests an append using definitive serialized bytes.</summary>
