@@ -115,7 +115,9 @@ public enum LedgerVerificationFailure
     /// <summary>Persisted data cannot be decoded under its declared format.</summary>
     InvalidEncoding,
     /// <summary>The declared format version is unsupported.</summary>
-    UnsupportedVersion
+    UnsupportedVersion,
+    /// <summary>The verified chain does not match the independently captured head.</summary>
+    HeadMismatch
 }
 
 /// <summary>Outcome and diagnostic state of ledger verification.</summary>

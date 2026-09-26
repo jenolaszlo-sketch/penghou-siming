@@ -6,44 +6,128 @@ public static partial class LedgerVerifier
     /// <summary>Verifies an in-memory complete ledger representation.</summary>
     public static LedgerVerificationResult Verify(LedgerId ledgerId, IReadOnlyList<LedgerEntry> entries, LedgerCheckpoint? checkpoint = null)
     {
-        if (checkpoint is not null && checkpoint.LedgerId != ledgerId)
-            return Failure(ledgerId, entries, 0, null, LedgerVerificationFailure.LedgerIdentityMismatch, "The checkpoint belongs to another ledger.");
-
-        var previous = LedgerFormatV1.GenesisHash;
-        LedgerHash? checkpointHash = checkpoint?.Sequence == 0 ? previous : null;
-        for (var index = 0; index < entries.Count; index++)
+        ArgumentNullException.ThrowIfNull(entries);
+        var state = new State(ledgerId, checkpoint, null);
+        var start = state.Start(null);
+        if (start is not null) return start;
+        foreach (var entry in entries)
         {
-            var entry = entries[index];
-            var expectedSequence = index + 1L;
-            if (entry.FormatVersion != LedgerFormatV1.Version)
-                return Failure(ledgerId, entries, index, entry.Sequence, LedgerVerificationFailure.UnsupportedVersion, $"Format version {entry.FormatVersion} is unsupported.");
-            if (entry.Sequence != expectedSequence)
-                return Failure(ledgerId, entries, index, entry.Sequence, LedgerVerificationFailure.SequenceGap, $"Expected sequence {expectedSequence}.");
-            if (entry.PreviousHash != previous)
-                return Failure(ledgerId, entries, index, entry.Sequence, entry.Sequence == 1 ? LedgerVerificationFailure.InvalidGenesis : LedgerVerificationFailure.PreviousHashMismatch, "The previous hash does not match the verified chain head.");
-            var calculated = LedgerFormatV1.ComputeHash(ledgerId, entry.Sequence, entry.CommittedAt, entry.StreamId, entry.EventType, new SerializedLedgerPayload(entry.Payload, entry.ContentType, entry.SerializationFormat, entry.SerializationVersion), entry.IdempotencyKey, previous);
-            if (calculated != entry.Hash)
-                return Failure(ledgerId, entries, index, entry.Sequence, LedgerVerificationFailure.RowHashMismatch, "The stored row hash does not match its committed fields.");
-            previous = entry.Hash;
-            if (checkpoint?.Sequence == entry.Sequence) checkpointHash = entry.Hash;
+            var failure = state.Accept(entry);
+            if (failure is not null) return failure;
         }
-
-        var head = new LedgerHead(ledgerId, entries.Count, previous, LedgerFormatV1.Version);
-        if (checkpoint is not null)
-        {
-            if (checkpoint.FormatVersion != LedgerFormatV1.Version)
-                return new(false, entries.Count, head, checkpoint.Sequence, LedgerVerificationFailure.UnsupportedVersion, "The checkpoint format version is unsupported.");
-            if (checkpoint.Sequence > entries.Count || checkpointHash is null)
-                return new(false, entries.Count, head, checkpoint.Sequence, LedgerVerificationFailure.CheckpointSequenceMismatch, "The ledger does not extend to the checkpoint sequence.");
-            if (checkpointHash.Value != checkpoint.HeadHash)
-                return new(false, entries.Count, head, checkpoint.Sequence, LedgerVerificationFailure.CheckpointHashMismatch, "The verified chain does not contain the checkpoint head.");
-        }
-        return new(true, entries.Count, head);
+        return state.Complete(null);
     }
 
-    private static LedgerVerificationResult Failure(LedgerId ledgerId, IReadOnlyList<LedgerEntry> entries, int verifiedEntries, long? sequence, LedgerVerificationFailure failure, string detail)
+    /// <summary>Verifies a snapshot against an independently captured head and checkpoint.</summary>
+    public static LedgerVerificationResult Verify(LedgerId ledgerId, IReadOnlyList<LedgerEntry> entries, LedgerHead target, LedgerCheckpoint? checkpoint = null)
     {
-        var hash = verifiedEntries == 0 ? LedgerFormatV1.GenesisHash : entries[verifiedEntries - 1].Hash;
-        return new(false, verifiedEntries, new LedgerHead(ledgerId, verifiedEntries, hash, LedgerFormatV1.Version), sequence, failure, detail);
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(target);
+        var state = new State(ledgerId, checkpoint, null);
+        var start = state.Start(target);
+        if (start is not null) return start;
+        foreach (var entry in entries)
+        {
+            var failure = state.Accept(entry);
+            if (failure is not null) return failure;
+        }
+        return state.Complete(target);
+    }
+
+    /// <summary>
+    /// Incremental verification state machine shared by synchronous and
+    /// asynchronous verification, with snapshot and head diagnostics.
+    /// </summary>
+    private sealed class State
+    {
+        private readonly LedgerId ledgerId;
+        private readonly LedgerCheckpoint? checkpoint;
+        private readonly IProgress<LedgerVerificationProgress>? progress;
+        private LedgerHash previous = LedgerFormatV1.GenesisHash;
+        private LedgerHash? checkpointHash;
+        private long verified;
+
+        public State(
+            LedgerId ledgerId,
+            LedgerCheckpoint? checkpoint,
+            IProgress<LedgerVerificationProgress>? progress)
+        {
+            this.ledgerId = ledgerId;
+            this.checkpoint = checkpoint;
+            this.progress = progress;
+            checkpointHash = checkpoint?.Sequence == 0 ? LedgerFormatV1.GenesisHash : null;
+        }
+
+        public long Verified => verified;
+
+        private LedgerHead CurrentHead =>
+            new(ledgerId, verified, previous, LedgerFormatV1.Version);
+
+        /// <summary>Validates the checkpoint and captured head before reading entries.</summary>
+        public LedgerVerificationResult? Start(LedgerHead? target)
+        {
+            if (checkpoint is not null && checkpoint.LedgerId != ledgerId)
+                return StartFailure(checkpoint.Sequence, LedgerVerificationFailure.LedgerIdentityMismatch,
+                    "The checkpoint belongs to another ledger.");
+            if (checkpoint is not null && checkpoint.FormatVersion != LedgerFormatV1.Version)
+                return StartFailure(checkpoint.Sequence, LedgerVerificationFailure.UnsupportedVersion,
+                    "The checkpoint format version is unsupported.");
+            if (target is not null && checkpoint is not null && checkpoint.Sequence > target.Sequence)
+                return StartFailure(checkpoint.Sequence, LedgerVerificationFailure.CheckpointSequenceMismatch,
+                    "The ledger does not extend to the checkpoint sequence.");
+            return null;
+        }
+
+        /// <summary>Reports a page boundary to the configured progress sink.</summary>
+        public void ReportProgress(long targetSequence) =>
+            progress?.Report(new(verified, targetSequence, previous));
+
+        /// <summary>Verifies and advances over one entry, or returns the failure.</summary>
+        public LedgerVerificationResult? Accept(LedgerEntry entry)
+        {
+            var failure = VerifyIncrementalEntry(ledgerId, entry, verified + 1, previous);
+            if (failure is not null)
+                return new(false, verified, CurrentHead, entry.Sequence,
+                    failure.Value.Failure, failure.Value.Detail);
+            previous = entry.Hash;
+            verified++;
+            if (checkpoint?.Sequence == entry.Sequence)
+                checkpointHash = entry.Hash;
+            return null;
+        }
+
+        /// <summary>Reports that the captured head cannot be reached from persisted entries.</summary>
+        public LedgerVerificationResult HeadGap() =>
+            new(false, verified, CurrentHead, verified + 1,
+                LedgerVerificationFailure.SequenceGap,
+                "The captured ledger head cannot be reached from persisted entries.");
+
+        /// <summary>Finalizes checkpoint and head/snapshot diagnostics.</summary>
+        public LedgerVerificationResult Complete(LedgerHead? target)
+        {
+            if (checkpoint is not null)
+            {
+                if (checkpointHash is null)
+                    return new(false, verified, CurrentHead, checkpoint.Sequence,
+                        LedgerVerificationFailure.CheckpointSequenceMismatch,
+                        "The ledger does not extend to the checkpoint sequence.");
+                if (checkpointHash.Value != checkpoint.HeadHash)
+                    return new(false, verified, CurrentHead, checkpoint.Sequence,
+                        LedgerVerificationFailure.CheckpointHashMismatch,
+                        "The verified chain does not contain the checkpoint head.");
+            }
+            var head = new LedgerHead(ledgerId, verified, previous, LedgerFormatV1.Version);
+            if (target is not null && (verified != target.Sequence || previous != target.Hash))
+                return new(false, verified, head, target.Sequence,
+                    LedgerVerificationFailure.HeadMismatch,
+                    "The verified entries do not match the captured ledger head.");
+            return new(true, verified, head);
+        }
+
+        private LedgerVerificationResult StartFailure(
+            long sequence, LedgerVerificationFailure failure, string detail) =>
+            new(false, 0,
+                new LedgerHead(ledgerId, 0, LedgerFormatV1.GenesisHash, LedgerFormatV1.Version),
+                sequence, failure, detail);
     }
 }

@@ -6,8 +6,9 @@ decisions live in the [implementation plan](implementation-plan.md) and
 
 ## Priority 1 — Harden verification and trust boundaries
 
-- [ ] Unify synchronous and asynchronous verification behind one incremental
-  state machine with precise head/snapshot failure diagnostics.
+- [x] Unify synchronous and asynchronous verification behind one incremental
+  state machine with precise head/snapshot failure diagnostics (`HeadMismatch`
+  plus a shared snapshot/head target overload).
 - [x] Bound checkpoint and signing-key inputs; hash large envelopes
   incrementally rather than copying the entire payload (checkpoint/envelope
   size limits, Ed25519 key-size and key-ID bounds, `IncrementalHash` row

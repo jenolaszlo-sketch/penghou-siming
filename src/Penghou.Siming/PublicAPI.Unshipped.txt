@@ -229,6 +229,7 @@ Penghou.Siming.LedgerReadRequest.Validate() -> void
 Penghou.Siming.LedgerVerificationFailure
 Penghou.Siming.LedgerVerificationFailure.CheckpointHashMismatch = 5 -> Penghou.Siming.LedgerVerificationFailure
 Penghou.Siming.LedgerVerificationFailure.CheckpointSequenceMismatch = 4 -> Penghou.Siming.LedgerVerificationFailure
+Penghou.Siming.LedgerVerificationFailure.HeadMismatch = 9 -> Penghou.Siming.LedgerVerificationFailure
 Penghou.Siming.LedgerVerificationFailure.InvalidEncoding = 7 -> Penghou.Siming.LedgerVerificationFailure
 Penghou.Siming.LedgerVerificationFailure.InvalidGenesis = 1 -> Penghou.Siming.LedgerVerificationFailure
 Penghou.Siming.LedgerVerificationFailure.LedgerIdentityMismatch = 6 -> Penghou.Siming.LedgerVerificationFailure
@@ -328,6 +329,7 @@ static Penghou.Siming.LedgerVerificationProgress.operator ==(Penghou.Siming.Ledg
 static Penghou.Siming.LedgerVerificationResult.operator !=(Penghou.Siming.LedgerVerificationResult? left, Penghou.Siming.LedgerVerificationResult? right) -> bool
 static Penghou.Siming.LedgerVerificationResult.operator ==(Penghou.Siming.LedgerVerificationResult? left, Penghou.Siming.LedgerVerificationResult? right) -> bool
 static Penghou.Siming.LedgerVerifier.Verify(Penghou.Siming.LedgerId ledgerId, System.Collections.Generic.IReadOnlyList<Penghou.Siming.LedgerEntry!>! entries, Penghou.Siming.LedgerCheckpoint? checkpoint = null) -> Penghou.Siming.LedgerVerificationResult!
+static Penghou.Siming.LedgerVerifier.Verify(Penghou.Siming.LedgerId ledgerId, System.Collections.Generic.IReadOnlyList<Penghou.Siming.LedgerEntry!>! entries, Penghou.Siming.LedgerHead! target, Penghou.Siming.LedgerCheckpoint? checkpoint = null) -> Penghou.Siming.LedgerVerificationResult!
 static Penghou.Siming.LedgerVerifier.VerifyAsync(Penghou.Siming.IAppendOnlyLedger! ledger, Penghou.Siming.LedgerCheckpoint? checkpoint = null, Penghou.Siming.LedgerVerificationOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerVerificationResult!>
 static Penghou.Siming.SerializedLedgerPayload.operator !=(Penghou.Siming.SerializedLedgerPayload? left, Penghou.Siming.SerializedLedgerPayload? right) -> bool
 static Penghou.Siming.SerializedLedgerPayload.operator ==(Penghou.Siming.SerializedLedgerPayload? left, Penghou.Siming.SerializedLedgerPayload? right) -> bool

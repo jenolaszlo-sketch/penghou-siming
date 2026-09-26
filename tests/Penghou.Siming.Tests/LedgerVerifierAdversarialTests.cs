@@ -86,6 +86,21 @@ public sealed class LedgerVerifierAdversarialTests
         Assert.Equal(LedgerVerificationFailure.CheckpointHashMismatch, anchored.Failure);
     }
 
+    [Fact]
+    public async Task CapturedHeadMismatch_ProducesPreciseHeadDiagnostic()
+    {
+        var (id, entries) = await CreateChainAsync();
+        var captured = new LedgerHead(id, entries.Length, entries[^1].Hash, LedgerFormatV1.Version);
+        var tampered = captured with { Hash = LedgerFormatV1.GenesisHash };
+
+        Assert.True(LedgerVerifier.Verify(id, entries, captured).IsValid);
+
+        var result = LedgerVerifier.Verify(id, entries, tampered);
+
+        Assert.Equal(LedgerVerificationFailure.HeadMismatch, result.Failure);
+        Assert.Equal(entries.Length, result.FailedSequence);
+    }
+
     private static async Task<(LedgerId Id, LedgerEntry[] Entries)> CreateChainAsync()
     {
         await using var ledger = new InMemoryAppendOnlyLedger<CanonicalJsonPayloadSerializer>(new());
