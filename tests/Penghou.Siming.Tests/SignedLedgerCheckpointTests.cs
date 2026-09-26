@@ -48,7 +48,7 @@ public sealed class SignedLedgerCheckpointTests
     {
         await using var ledger = new InMemoryAppendOnlyLedger<CanonicalJsonPayloadSerializer>(new());
         var checkpoint = await LedgerCheckpoints.CaptureAsync(ledger);
-        using var original = Ed25519CheckpointSigner.Generate("recoverable");
+        using var original = Ed25519CheckpointSigner.Generate("recoverable", allowPlaintextExport: true);
         using var imported = Ed25519CheckpointSigner.Import(
             original.ExportPrivateKey(), original.KeyId);
 
@@ -86,5 +86,50 @@ public sealed class SignedLedgerCheckpointTests
         Assert.Throws<ArgumentException>(() =>
             Ed25519CheckpointSigner.Generate(
                 new string('a', SignedLedgerCheckpoints.MaximumKeyIdUtf8Bytes + 1)));
+    }
+
+    [Fact]
+    public void GeneratedKeys_AreNonExportableByDefaultAndExportOnlyOnOptIn()
+    {
+        using var nonExportable = Ed25519CheckpointSigner.Generate("default");
+        Assert.Throws<InvalidOperationException>(() => nonExportable.ExportPrivateKey());
+
+        using var exportable = Ed25519CheckpointSigner.Generate("opt-in", allowPlaintextExport: true);
+        Assert.Equal(32, exportable.ExportPrivateKey().Length);
+        Assert.Equal(32, exportable.ExportPublicKey().Length);
+    }
+
+    [Fact]
+    public async Task CustomSignerAndVerifier_PlugInThroughInterfaces()
+    {
+        await using var ledger = new InMemoryAppendOnlyLedger<CanonicalJsonPayloadSerializer>(new());
+        var checkpoint = await LedgerCheckpoints.CaptureAsync(ledger);
+        using var inner = Ed25519CheckpointSigner.Generate("custom");
+        var signer = new DelegatingSigner(inner);
+        var verifier = new DelegatingVerifier(
+            new Ed25519CheckpointVerifier(inner.ExportPublicKey(), "custom"));
+
+        var signed = SignedLedgerCheckpoints.Sign(checkpoint, signer);
+
+        Assert.Equal("Ed25519", signed.Algorithm);
+        Assert.True(SignedLedgerCheckpoints.Verify(signed, verifier, out var verified));
+        Assert.Equal(checkpoint, verified);
+    }
+
+    private sealed class DelegatingSigner(Ed25519CheckpointSigner inner) : ILedgerCheckpointSigner
+    {
+        public string Algorithm => ((ILedgerCheckpointSigner)inner).Algorithm;
+        public string KeyId => inner.KeyId;
+        public byte[] Sign(ReadOnlySpan<byte> input) => ((ILedgerCheckpointSigner)inner).Sign(input);
+        public void Dispose() { }
+    }
+
+    private sealed class DelegatingVerifier(Ed25519CheckpointVerifier inner) : ILedgerCheckpointVerifier
+    {
+        public string Algorithm => ((ILedgerCheckpointVerifier)inner).Algorithm;
+        public string KeyId => inner.KeyId;
+        public string Fingerprint => inner.Fingerprint;
+        public bool Verify(ReadOnlySpan<byte> input, ReadOnlySpan<byte> signature) =>
+            ((ILedgerCheckpointVerifier)inner).Verify(input, signature);
     }
 }

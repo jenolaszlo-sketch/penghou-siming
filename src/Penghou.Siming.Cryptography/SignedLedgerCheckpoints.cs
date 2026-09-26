@@ -13,6 +13,35 @@ public sealed record SignedLedgerCheckpoint(
     ReadOnlyMemory<byte> CheckpointDocument,
     ReadOnlyMemory<byte> Signature);
 
+/// <summary>Signs detached checkpoint signatures, including OS, HSM, or remote signers.</summary>
+public interface ILedgerCheckpointSigner : IDisposable
+{
+    /// <summary>Gets the signature algorithm identifier committed by signatures.</summary>
+    string Algorithm { get; }
+
+    /// <summary>Gets the caller-assigned key identifier committed by signatures.</summary>
+    string KeyId { get; }
+
+    /// <summary>Signs the domain-separated checkpoint input and returns the detached signature.</summary>
+    byte[] Sign(ReadOnlySpan<byte> input);
+}
+
+/// <summary>Verifies detached checkpoint signatures against a trusted key.</summary>
+public interface ILedgerCheckpointVerifier
+{
+    /// <summary>Gets the expected signature algorithm identifier.</summary>
+    string Algorithm { get; }
+
+    /// <summary>Gets the expected key identifier.</summary>
+    string KeyId { get; }
+
+    /// <summary>Gets a stable, human-checkable fingerprint of the trusted key.</summary>
+    string Fingerprint { get; }
+
+    /// <summary>Verifies a detached signature over the domain-separated checkpoint input.</summary>
+    bool Verify(ReadOnlySpan<byte> input, ReadOnlySpan<byte> signature);
+}
+
 /// <summary>Creates, verifies, imports, and exports signed checkpoint envelopes.</summary>
 public static class SignedLedgerCheckpoints
 {
@@ -38,24 +67,24 @@ public static class SignedLedgerCheckpoints
     /// <summary>Signs a canonical portable checkpoint document.</summary>
     public static SignedLedgerCheckpoint Sign(
         LedgerCheckpoint checkpoint,
-        Ed25519CheckpointSigner signer)
+        ILedgerCheckpointSigner signer)
     {
         ArgumentNullException.ThrowIfNull(signer);
         var document = LedgerCheckpoints.Export(checkpoint);
-        return new("Ed25519", signer.KeyId, document,
+        return new(signer.Algorithm, signer.KeyId, document,
             signer.Sign(CreateInput(signer.KeyId, document)));
     }
 
     /// <summary>Verifies the signature and imports the authenticated checkpoint.</summary>
     public static bool Verify(
         SignedLedgerCheckpoint signed,
-        Ed25519CheckpointVerifier verifier,
+        ILedgerCheckpointVerifier verifier,
         out LedgerCheckpoint? checkpoint)
     {
         ArgumentNullException.ThrowIfNull(signed);
         ArgumentNullException.ThrowIfNull(verifier);
         checkpoint = null;
-        if (!signed.Algorithm.Equals("Ed25519", StringComparison.Ordinal) ||
+        if (!signed.Algorithm.Equals(verifier.Algorithm, StringComparison.Ordinal) ||
             !signed.KeyId.Equals(verifier.KeyId, StringComparison.Ordinal) ||
             !verifier.Verify(
                 CreateInput(signed.KeyId, signed.CheckpointDocument.Span),
@@ -143,12 +172,13 @@ public static class SignedLedgerCheckpoints
 }
 
 /// <summary>Ed25519 private-key checkpoint signer.</summary>
-public sealed class Ed25519CheckpointSigner : IDisposable
+public sealed class Ed25519CheckpointSigner : ILedgerCheckpointSigner
 {
     private static readonly SignatureAlgorithm Algorithm = SignatureAlgorithm.Ed25519;
     private readonly Key key;
     /// <summary>Gets the caller-assigned key identifier committed by signatures.</summary>
     public string KeyId { get; }
+    string ILedgerCheckpointSigner.Algorithm => "Ed25519";
 
     private Ed25519CheckpointSigner(Key key, string keyId)
     {
@@ -156,14 +186,20 @@ public sealed class Ed25519CheckpointSigner : IDisposable
         KeyId = SignedLedgerCheckpoints.RequireKeyId(keyId, nameof(keyId));
     }
 
-    /// <summary>Generates a new plaintext-exportable Ed25519 key for the preview API.</summary>
-    public static Ed25519CheckpointSigner Generate(string keyId) => new(
+    /// <summary>Generates a new non-exportable Ed25519 key.</summary>
+    public static Ed25519CheckpointSigner Generate(string keyId) =>
+        Generate(keyId, allowPlaintextExport: false);
+
+    /// <summary>Generates a new Ed25519 key, optionally allowing raw private-key export.</summary>
+    public static Ed25519CheckpointSigner Generate(string keyId, bool allowPlaintextExport) => new(
         Key.Create(Algorithm, new KeyCreationParameters
         {
-            ExportPolicy = KeyExportPolicies.AllowPlaintextExport
+            ExportPolicy = allowPlaintextExport
+                ? KeyExportPolicies.AllowPlaintextExport
+                : KeyExportPolicies.None
         }), keyId);
 
-    /// <summary>Imports a raw Ed25519 private key.</summary>
+    /// <summary>Imports a raw Ed25519 private key as a non-exportable key.</summary>
     public static Ed25519CheckpointSigner Import(
         ReadOnlySpan<byte> privateKey,
         string keyId)
@@ -174,23 +210,21 @@ public sealed class Ed25519CheckpointSigner : IDisposable
                 nameof(privateKey));
         return new(
             Key.Import(Algorithm, privateKey, KeyBlobFormat.RawPrivateKey,
-                new KeyCreationParameters
-                {
-                    ExportPolicy = KeyExportPolicies.AllowPlaintextExport
-                }), keyId);
+                new KeyCreationParameters { ExportPolicy = KeyExportPolicies.None }),
+            keyId);
     }
 
-    /// <summary>Exports the raw private key. The caller must protect and clear it.</summary>
+    /// <summary>Exports the raw private key, which requires a key generated as exportable.</summary>
     public byte[] ExportPrivateKey() => key.Export(KeyBlobFormat.RawPrivateKey);
     /// <summary>Exports the raw public verification key.</summary>
     public byte[] ExportPublicKey() => key.PublicKey.Export(KeyBlobFormat.RawPublicKey);
-    internal byte[] Sign(ReadOnlySpan<byte> input) => Algorithm.Sign(key, input);
+    byte[] ILedgerCheckpointSigner.Sign(ReadOnlySpan<byte> input) => Algorithm.Sign(key, input);
     /// <inheritdoc />
     public void Dispose() => key.Dispose();
 }
 
 /// <summary>Public-key-only Ed25519 checkpoint verifier.</summary>
-public sealed class Ed25519CheckpointVerifier
+public sealed class Ed25519CheckpointVerifier : ILedgerCheckpointVerifier
 {
     private static readonly SignatureAlgorithm Algorithm = SignatureAlgorithm.Ed25519;
     private readonly PublicKey key;
@@ -199,6 +233,7 @@ public sealed class Ed25519CheckpointVerifier
 
     /// <summary>Gets the lowercase-hex SHA-256 fingerprint of the imported public key.</summary>
     public string Fingerprint { get; }
+    string ILedgerCheckpointVerifier.Algorithm => "Ed25519";
 
     /// <summary>Imports a raw Ed25519 public key and its expected identifier.</summary>
     public Ed25519CheckpointVerifier(ReadOnlySpan<byte> publicKey, string keyId)
@@ -213,7 +248,8 @@ public sealed class Ed25519CheckpointVerifier
             SHA256.HashData(key.Export(KeyBlobFormat.RawPublicKey))).ToLowerInvariant();
     }
 
-    internal bool Verify(ReadOnlySpan<byte> input, ReadOnlySpan<byte> signature) =>
+    bool ILedgerCheckpointVerifier.Verify(
+        ReadOnlySpan<byte> input, ReadOnlySpan<byte> signature) =>
         signature.Length == Algorithm.SignatureSize &&
         Algorithm.Verify(key, input, signature);
 }
