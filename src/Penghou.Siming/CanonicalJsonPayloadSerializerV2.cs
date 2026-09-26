@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Security.Cryptography;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 
 namespace Penghou.Siming;
 
@@ -61,8 +62,11 @@ public sealed class CanonicalJsonPayloadSerializerV2(JsonSerializerOptions? seri
     }
 
     /// <summary>Parses persisted UTF-8 JSON and returns its canonical UTF-8 representation.</summary>
+    /// <exception cref="JsonException">The bytes are not valid UTF-8 or the tree is not canonicalizable.</exception>
     public static ReadOnlyMemory<byte> Canonicalize(ReadOnlyMemory<byte> utf8Json)
     {
+        if (!Utf8.IsValid(utf8Json.Span))
+            throw new JsonException($"Persisted JSON must be valid UTF-8 under {Contract}.");
         using var document = JsonDocument.Parse(utf8Json);
         return Canonicalize(document.RootElement);
     }

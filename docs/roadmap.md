@@ -26,9 +26,11 @@ decisions live in the [implementation plan](implementation-plan.md) and
   reinterpretation; downstream logical-content adapters must wait for the v2
   package release.
 
-- [ ] Complete adversarial coverage for every committed field, malformed
+- [x] Complete adversarial coverage for every committed field, malformed
   encoding, insertion, deletion, reordering, truncation, replacement chains,
-  culture, and unsupported versions.
+  culture, and unsupported versions (v2 now rejects non-UTF-8 persisted JSON
+  explicitly with `JsonException`; culture independence and version/insertion
+  cases covered).
 - [ ] Add immutable public ledger-context binding in a future format/ledger
   epoch. Commit a canonical digest of application, environment, tenant,
   deployment, or similar external identity.

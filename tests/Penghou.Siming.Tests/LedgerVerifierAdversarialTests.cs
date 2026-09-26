@@ -87,6 +87,40 @@ public sealed class LedgerVerifierAdversarialTests
     }
 
     [Fact]
+    public async Task InsertedDuplicateRow_ProducesSequenceGap()
+    {
+        var (id, entries) = await CreateChainAsync();
+
+        var result = LedgerVerifier.Verify(
+            id, [entries[0], entries[0], entries[1], entries[2]]);
+
+        Assert.Equal(LedgerVerificationFailure.SequenceGap, result.Failure);
+        Assert.Equal(entries[0].Sequence, result.FailedSequence);
+    }
+
+    [Fact]
+    public async Task UnsupportedEntryFormatVersion_ReportsUnsupportedVersion()
+    {
+        var (id, entries) = await CreateChainAsync();
+
+        var result = LedgerVerifier.Verify(id, [entries[0] with { FormatVersion = 99 }]);
+
+        Assert.Equal(LedgerVerificationFailure.UnsupportedVersion, result.Failure);
+    }
+
+    [Fact]
+    public async Task UnsupportedCheckpointFormatVersion_ReportsUnsupportedVersion()
+    {
+        var (id, entries) = await CreateChainAsync();
+        var checkpoint = new LedgerCheckpoint(
+            id, 1, entries[0].Hash, DateTimeOffset.UtcNow, 99);
+
+        var result = LedgerVerifier.Verify(id, entries, checkpoint);
+
+        Assert.Equal(LedgerVerificationFailure.UnsupportedVersion, result.Failure);
+    }
+
+    [Fact]
     public async Task CapturedHeadMismatch_ProducesPreciseHeadDiagnostic()
     {
         var (id, entries) = await CreateChainAsync();
