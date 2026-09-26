@@ -83,15 +83,22 @@ decisions live in the [implementation plan](implementation-plan.md) and
 
 ## Priority 4 — Guyabano adoption
 
-- [ ] Add `Guyabano.Session.Sqlite` as the domain adapter; keep coding-specific
-  event types out of Siming.
-- [ ] Migrate append-only session events from JSONL without rewriting their
-  historical meaning.
-- [ ] Keep current state, pending input, workspace, approval, timeline, and
-  reconciliation tables as rebuildable projections.
-- [ ] Anchor selected ledger checkpoints to generated Git commits or another
-  independently retained location.
-- [ ] Add end-to-end crash, retry, reconciliation, and projection-rebuild tests.
+- [x] Add `Guyabano.Session.Sqlite` as the domain adapter; keep coding-specific
+  event types out of Siming. (Adapter exists on `Penghou.Siming.Sqlite`
+  `0.1.0-preview.6`; extended with checkpoint capture/verify and Git-trailer
+  anchoring; session payloads stay Guyabano-side.)
+- [x] Migrate append-only session events from JSONL without rewriting their
+  historical meaning. (No JSONL event persistence remains in Guyabano or
+  Hongxian; the Siming ledger is the event store. Nothing to migrate.)
+- [x] Keep current state, pending input, workspace, approval, timeline, and
+  reconciliation tables as rebuildable projections. (`RebuildAsync` coverage
+  exists and passes.)
+- [x] Anchor selected ledger checkpoints to generated Git commits or another
+  independently retained location. (`SimingSessionCheckpointAnchoring` anchors
+  `Siming-Checkpoint` trailers and re-verifies; tested.)
+- [x] Add end-to-end crash, retry, reconciliation, and projection-rebuild tests.
+  (Crash-simulation coverage added; retry, reconciliation, and
+  projection-rebuild suites exist and pass.)
 
 ## Deferred until demonstrated need
 
