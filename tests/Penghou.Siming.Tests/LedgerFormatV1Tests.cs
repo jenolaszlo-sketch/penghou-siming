@@ -38,4 +38,22 @@ public sealed class LedgerFormatV1Tests
         Assert.NotEqual(first, changedBytes);
         Assert.NotEqual(first, changedFormat);
     }
+
+    [Fact]
+    public void LargePayload_HashesDeterministicallyWithoutConcatenation()
+    {
+        var id = new LedgerId(Guid.Parse("00112233-4455-6677-8899-aabbccddeeff"));
+        var time = DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_000_123);
+        var payload = new byte[(1 << 20) + 7];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(payload);
+        var changed = payload.ToArray();
+        changed[^1] ^= 1;
+
+        var first = LedgerFormatV1.ComputeHash(id, 1, time, "s", "e", new(payload, "application/octet-stream", "raw", 1), null, LedgerFormatV1.GenesisHash);
+        var repeat = LedgerFormatV1.ComputeHash(id, 1, time, "s", "e", new(payload, "application/octet-stream", "raw", 1), null, LedgerFormatV1.GenesisHash);
+        var different = LedgerFormatV1.ComputeHash(id, 1, time, "s", "e", new(changed, "application/octet-stream", "raw", 1), null, LedgerFormatV1.GenesisHash);
+
+        Assert.Equal(first, repeat);
+        Assert.NotEqual(first, different);
+    }
 }

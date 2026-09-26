@@ -73,7 +73,8 @@ public static class Program
             LedgerCheckpoint? checkpoint = null;
             if (checkpointPath is not null)
                 checkpoint = LedgerCheckpoints.Import(
-                    await File.ReadAllBytesAsync(checkpointPath, cancellationToken)
+                    await ReadBoundedAsync(checkpointPath,
+                        LedgerCheckpoints.MaximumDocumentBytes, "checkpoint", cancellationToken)
                         .ConfigureAwait(false));
             if (signedCheckpointPath is not null)
             {
@@ -81,10 +82,11 @@ public static class Program
                     throw new ArgumentException(
                         "--signed-checkpoint requires --public-key and --key-id.");
                 var signed = SignedLedgerCheckpoints.Import(
-                    await File.ReadAllBytesAsync(signedCheckpointPath, cancellationToken)
-                        .ConfigureAwait(false));
+                    await ReadBoundedAsync(signedCheckpointPath,
+                        SignedLedgerCheckpoints.MaximumEnvelopeBytes, "signed checkpoint",
+                        cancellationToken).ConfigureAwait(false));
                 var verifier = new Ed25519CheckpointVerifier(
-                    await File.ReadAllBytesAsync(publicKeyPath, cancellationToken)
+                    await ReadBoundedAsync(publicKeyPath, 4096, "public key", cancellationToken)
                         .ConfigureAwait(false),
                     keyId);
                 keyFingerprint = verifier.Fingerprint;
@@ -144,6 +146,16 @@ public static class Program
             new { valid = false, failure = "InvalidInput", detail },
             new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }))
             .ConfigureAwait(false);
+
+    private static async Task<byte[]> ReadBoundedAsync(
+        string path, int maximumBytes, string kind, CancellationToken cancellationToken)
+    {
+        var length = new FileInfo(path).Length;
+        if (length > maximumBytes)
+            throw new FormatException(
+                $"The {kind} file is {length} bytes; the maximum is {maximumBytes} bytes.");
+        return await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+    }
 
     private static async Task WriteResultAsync(TextWriter output, object value) =>
         await output.WriteLineAsync(JsonSerializer.Serialize(value,

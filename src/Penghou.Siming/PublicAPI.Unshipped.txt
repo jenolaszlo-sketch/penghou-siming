@@ -9,6 +9,7 @@ const Penghou.Siming.CanonicalJsonPayloadSerializerV2.MaximumExponentLength = 12
 const Penghou.Siming.CanonicalJsonPayloadSerializerV2.MaximumNumberLength = 1000000 -> int
 const Penghou.Siming.CanonicalJsonPayloadSerializerV2.Sha256Contract = "penghou-canonical-json-v2-sha256" -> string!
 const Penghou.Siming.CanonicalJsonPayloadSerializerV2.Version = 2 -> int
+const Penghou.Siming.LedgerCheckpoints.MaximumDocumentBytes = 65536 -> int
 const Penghou.Siming.LedgerFormatV1.Version = 1 -> int
 const Penghou.Siming.LedgerHash.Size = 32 -> int
 const Penghou.Siming.LedgerReadRequest.MaximumLimit = 10000 -> int

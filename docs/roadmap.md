@@ -8,8 +8,10 @@ decisions live in the [implementation plan](implementation-plan.md) and
 
 - [ ] Unify synchronous and asynchronous verification behind one incremental
   state machine with precise head/snapshot failure diagnostics.
-- [ ] Bound checkpoint and signing-key inputs; hash large envelopes
-  incrementally rather than copying the entire payload.
+- [x] Bound checkpoint and signing-key inputs; hash large envelopes
+  incrementally rather than copying the entire payload (checkpoint/envelope
+  size limits, Ed25519 key-size and key-ID bounds, `IncrementalHash` row
+  hashing that preserves the v1 byte sequence).
 - [ ] Make generated signing keys non-exportable by default and define extension
   points for OS, HSM, and remote signers.
 - [x] Return machine-readable CLI input errors and the verified key fingerprint.

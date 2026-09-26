@@ -19,6 +19,22 @@ public static class SignedLedgerCheckpoints
     private static readonly byte[] Domain =
         "penghou-siming-signed-checkpoint-v1\0"u8.ToArray();
 
+    /// <summary>Largest signed checkpoint envelope accepted by <see cref="Import"/>.</summary>
+    public const int MaximumEnvelopeBytes = 256 * 1024;
+
+    /// <summary>Largest UTF-8 key identifier accepted by signers and verifiers.</summary>
+    public const int MaximumKeyIdUtf8Bytes = 256;
+
+    internal static string RequireKeyId(string value, string parameterName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException("Key ID cannot be empty.", parameterName);
+        if (Encoding.UTF8.GetByteCount(value) > MaximumKeyIdUtf8Bytes)
+            throw new ArgumentException(
+                $"Key ID cannot exceed {MaximumKeyIdUtf8Bytes} UTF-8 bytes.", parameterName);
+        return value;
+    }
+
     /// <summary>Signs a canonical portable checkpoint document.</summary>
     public static SignedLedgerCheckpoint Sign(
         LedgerCheckpoint checkpoint,
@@ -78,18 +94,28 @@ public static class SignedLedgerCheckpoints
     /// <summary>Imports a signed checkpoint envelope without trusting its signature.</summary>
     public static SignedLedgerCheckpoint Import(ReadOnlySpan<byte> utf8Json)
     {
+        if (utf8Json.Length > MaximumEnvelopeBytes)
+            throw new FormatException(
+                $"The signed checkpoint envelope is {utf8Json.Length} bytes; the maximum is {MaximumEnvelopeBytes} bytes.");
         try
         {
-            using var document = JsonDocument.Parse(utf8Json.ToArray());
+            using var document = JsonDocument.Parse(
+                utf8Json.ToArray(), new JsonDocumentOptions { MaxDepth = 16 });
             var root = document.RootElement;
             if (root.GetProperty("documentType").GetString() !=
                     "penghou-siming-signed-checkpoint" ||
                 root.GetProperty("documentVersion").GetInt32() != 1)
                 throw new FormatException("The signed checkpoint type or version is unsupported.");
+            var checkpoint = root.GetProperty("checkpoint").GetBytesFromBase64();
+            if (checkpoint.Length > LedgerCheckpoints.MaximumDocumentBytes)
+                throw new FormatException(
+                    $"The embedded checkpoint is {checkpoint.Length} bytes; the maximum is {LedgerCheckpoints.MaximumDocumentBytes} bytes.");
+            var algorithm = root.GetProperty("algorithm").GetString()!;
+            var keyId = RequireKeyId(root.GetProperty("keyId").GetString()!, "keyId");
             return new(
-                root.GetProperty("algorithm").GetString()!,
-                root.GetProperty("keyId").GetString()!,
-                root.GetProperty("checkpoint").GetBytesFromBase64(),
+                algorithm,
+                keyId,
+                checkpoint,
                 root.GetProperty("signature").GetBytesFromBase64());
         }
         catch (FormatException)
@@ -127,7 +153,7 @@ public sealed class Ed25519CheckpointSigner : IDisposable
     private Ed25519CheckpointSigner(Key key, string keyId)
     {
         this.key = key;
-        KeyId = RequireKeyId(keyId);
+        KeyId = SignedLedgerCheckpoints.RequireKeyId(keyId, nameof(keyId));
     }
 
     /// <summary>Generates a new plaintext-exportable Ed25519 key for the preview API.</summary>
@@ -140,12 +166,19 @@ public sealed class Ed25519CheckpointSigner : IDisposable
     /// <summary>Imports a raw Ed25519 private key.</summary>
     public static Ed25519CheckpointSigner Import(
         ReadOnlySpan<byte> privateKey,
-        string keyId) => new(
+        string keyId)
+    {
+        if (privateKey.Length != Algorithm.PrivateKeySize)
+            throw new ArgumentException(
+                $"An Ed25519 private key must contain {Algorithm.PrivateKeySize} bytes.",
+                nameof(privateKey));
+        return new(
             Key.Import(Algorithm, privateKey, KeyBlobFormat.RawPrivateKey,
                 new KeyCreationParameters
                 {
                     ExportPolicy = KeyExportPolicies.AllowPlaintextExport
                 }), keyId);
+    }
 
     /// <summary>Exports the raw private key. The caller must protect and clear it.</summary>
     public byte[] ExportPrivateKey() => key.Export(KeyBlobFormat.RawPrivateKey);
@@ -154,11 +187,6 @@ public sealed class Ed25519CheckpointSigner : IDisposable
     internal byte[] Sign(ReadOnlySpan<byte> input) => Algorithm.Sign(key, input);
     /// <inheritdoc />
     public void Dispose() => key.Dispose();
-
-    private static string RequireKeyId(string value) =>
-        string.IsNullOrWhiteSpace(value)
-            ? throw new ArgumentException("Key ID cannot be empty.", nameof(value))
-            : value;
 }
 
 /// <summary>Public-key-only Ed25519 checkpoint verifier.</summary>
@@ -175,10 +203,12 @@ public sealed class Ed25519CheckpointVerifier
     /// <summary>Imports a raw Ed25519 public key and its expected identifier.</summary>
     public Ed25519CheckpointVerifier(ReadOnlySpan<byte> publicKey, string keyId)
     {
+        if (publicKey.Length != Algorithm.PublicKeySize)
+            throw new ArgumentException(
+                $"An Ed25519 public key must contain {Algorithm.PublicKeySize} bytes.",
+                nameof(publicKey));
         key = PublicKey.Import(Algorithm, publicKey, KeyBlobFormat.RawPublicKey);
-        KeyId = string.IsNullOrWhiteSpace(keyId)
-            ? throw new ArgumentException("Key ID cannot be empty.", nameof(keyId))
-            : keyId;
+        KeyId = SignedLedgerCheckpoints.RequireKeyId(keyId, nameof(keyId));
         Fingerprint = Convert.ToHexString(
             SHA256.HashData(key.Export(KeyBlobFormat.RawPublicKey))).ToLowerInvariant();
     }

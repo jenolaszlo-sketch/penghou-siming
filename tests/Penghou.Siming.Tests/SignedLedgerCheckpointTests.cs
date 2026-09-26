@@ -59,4 +59,32 @@ public sealed class SignedLedgerCheckpointTests
             new Ed25519CheckpointVerifier(original.ExportPublicKey(), original.KeyId),
             out _));
     }
+
+    [Fact]
+    public void Import_RejectsOversizedEnvelopeAndEmbeddedCheckpoint()
+    {
+        Assert.Throws<FormatException>(() =>
+            SignedLedgerCheckpoints.Import(new byte[SignedLedgerCheckpoints.MaximumEnvelopeBytes + 1]));
+
+        var oversizedDocument = new byte[LedgerCheckpoints.MaximumDocumentBytes + 1];
+        var envelope = new SignedLedgerCheckpoint(
+            "Ed25519", "k", oversizedDocument, new byte[64]);
+
+        var error = Assert.Throws<FormatException>(() =>
+            SignedLedgerCheckpoints.Import(SignedLedgerCheckpoints.Export(envelope)));
+
+        Assert.Contains("checkpoint", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Keys_RejectWrongSizesAndOversizedIdentifiers()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            Ed25519CheckpointSigner.Import(new byte[31], "k"));
+        Assert.Throws<ArgumentException>(() =>
+            new Ed25519CheckpointVerifier(new byte[31], "k"));
+        Assert.Throws<ArgumentException>(() =>
+            Ed25519CheckpointSigner.Generate(
+                new string('a', SignedLedgerCheckpoints.MaximumKeyIdUtf8Bytes + 1)));
+    }
 }

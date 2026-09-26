@@ -1,4 +1,6 @@
 #nullable enable
+const Penghou.Siming.Cryptography.SignedLedgerCheckpoints.MaximumEnvelopeBytes = 262144 -> int
+const Penghou.Siming.Cryptography.SignedLedgerCheckpoints.MaximumKeyIdUtf8Bytes = 256 -> int
 override Penghou.Siming.Cryptography.SignedLedgerCheckpoint.Equals(object? obj) -> bool
 override Penghou.Siming.Cryptography.SignedLedgerCheckpoint.GetHashCode() -> int
 override Penghou.Siming.Cryptography.SignedLedgerCheckpoint.ToString() -> string!

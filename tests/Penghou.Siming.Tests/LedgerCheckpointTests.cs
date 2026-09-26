@@ -44,6 +44,17 @@ public sealed class LedgerCheckpointTests
             LedgerCheckpoints.Import(Encoding.UTF8.GetBytes(document)));
     }
 
+    [Fact]
+    public void Import_RejectsDocumentsBeyondTheConfiguredBound()
+    {
+        var oversized = new byte[LedgerCheckpoints.MaximumDocumentBytes + 1];
+
+        var error = Assert.Throws<FormatException>(() =>
+            LedgerCheckpoints.Import(oversized));
+
+        Assert.Contains("maximum", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class FixedTimeProvider(DateTimeOffset value) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => value;

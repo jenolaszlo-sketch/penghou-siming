@@ -5,6 +5,9 @@ namespace Penghou.Siming;
 /// <summary>Captures and serializes portable versioned ledger checkpoints.</summary>
 public static class LedgerCheckpoints
 {
+    /// <summary>Largest portable checkpoint document accepted by <see cref="Import"/>.</summary>
+    public const int MaximumDocumentBytes = 64 * 1024;
+
     /// <summary>Captures the ledger's current head as a checkpoint.</summary>
     public static async ValueTask<LedgerCheckpoint> CaptureAsync(
         IAppendOnlyLedger ledger,
@@ -45,9 +48,13 @@ public static class LedgerCheckpoints
     /// <summary>Imports and validates a portable checkpoint document.</summary>
     public static LedgerCheckpoint Import(ReadOnlySpan<byte> utf8Json)
     {
+        if (utf8Json.Length > MaximumDocumentBytes)
+            throw new FormatException(
+                $"The checkpoint document is {utf8Json.Length} bytes; the maximum is {MaximumDocumentBytes} bytes.");
         try
         {
-            using var document = JsonDocument.Parse(utf8Json.ToArray());
+            using var document = JsonDocument.Parse(
+                utf8Json.ToArray(), new JsonDocumentOptions { MaxDepth = 16 });
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object ||
                 root.GetProperty("documentType").GetString() != "penghou-siming-checkpoint" ||
