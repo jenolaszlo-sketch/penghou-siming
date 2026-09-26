@@ -1,0 +1,35 @@
+#nullable enable
+override Penghou.Siming.Cryptography.SignedLedgerCheckpoint.Equals(object? obj) -> bool
+override Penghou.Siming.Cryptography.SignedLedgerCheckpoint.GetHashCode() -> int
+override Penghou.Siming.Cryptography.SignedLedgerCheckpoint.ToString() -> string!
+Penghou.Siming.Cryptography.Ed25519CheckpointSigner
+Penghou.Siming.Cryptography.Ed25519CheckpointSigner.Dispose() -> void
+Penghou.Siming.Cryptography.Ed25519CheckpointSigner.ExportPrivateKey() -> byte[]!
+Penghou.Siming.Cryptography.Ed25519CheckpointSigner.ExportPublicKey() -> byte[]!
+Penghou.Siming.Cryptography.Ed25519CheckpointSigner.KeyId.get -> string!
+Penghou.Siming.Cryptography.Ed25519CheckpointVerifier
+Penghou.Siming.Cryptography.Ed25519CheckpointVerifier.Ed25519CheckpointVerifier(System.ReadOnlySpan<byte> publicKey, string! keyId) -> void
+Penghou.Siming.Cryptography.Ed25519CheckpointVerifier.Fingerprint.get -> string!
+Penghou.Siming.Cryptography.Ed25519CheckpointVerifier.KeyId.get -> string!
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.<Clone>$() -> Penghou.Siming.Cryptography.SignedLedgerCheckpoint!
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.Algorithm.get -> string!
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.Algorithm.init -> void
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.CheckpointDocument.get -> System.ReadOnlyMemory<byte>
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.CheckpointDocument.init -> void
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.Deconstruct(out string! Algorithm, out string! KeyId, out System.ReadOnlyMemory<byte> CheckpointDocument, out System.ReadOnlyMemory<byte> Signature) -> void
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.Equals(Penghou.Siming.Cryptography.SignedLedgerCheckpoint? other) -> bool
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.KeyId.get -> string!
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.KeyId.init -> void
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.Signature.get -> System.ReadOnlyMemory<byte>
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.Signature.init -> void
+Penghou.Siming.Cryptography.SignedLedgerCheckpoint.SignedLedgerCheckpoint(string! Algorithm, string! KeyId, System.ReadOnlyMemory<byte> CheckpointDocument, System.ReadOnlyMemory<byte> Signature) -> void
+Penghou.Siming.Cryptography.SignedLedgerCheckpoints
+static Penghou.Siming.Cryptography.Ed25519CheckpointSigner.Generate(string! keyId) -> Penghou.Siming.Cryptography.Ed25519CheckpointSigner!
+static Penghou.Siming.Cryptography.Ed25519CheckpointSigner.Import(System.ReadOnlySpan<byte> privateKey, string! keyId) -> Penghou.Siming.Cryptography.Ed25519CheckpointSigner!
+static Penghou.Siming.Cryptography.SignedLedgerCheckpoint.operator !=(Penghou.Siming.Cryptography.SignedLedgerCheckpoint? left, Penghou.Siming.Cryptography.SignedLedgerCheckpoint? right) -> bool
+static Penghou.Siming.Cryptography.SignedLedgerCheckpoint.operator ==(Penghou.Siming.Cryptography.SignedLedgerCheckpoint? left, Penghou.Siming.Cryptography.SignedLedgerCheckpoint? right) -> bool
+static Penghou.Siming.Cryptography.SignedLedgerCheckpoints.Export(Penghou.Siming.Cryptography.SignedLedgerCheckpoint! signed) -> byte[]!
+static Penghou.Siming.Cryptography.SignedLedgerCheckpoints.Import(System.ReadOnlySpan<byte> utf8Json) -> Penghou.Siming.Cryptography.SignedLedgerCheckpoint!
+static Penghou.Siming.Cryptography.SignedLedgerCheckpoints.Sign(Penghou.Siming.LedgerCheckpoint! checkpoint, Penghou.Siming.Cryptography.Ed25519CheckpointSigner! signer) -> Penghou.Siming.Cryptography.SignedLedgerCheckpoint!
+static Penghou.Siming.Cryptography.SignedLedgerCheckpoints.Verify(Penghou.Siming.Cryptography.SignedLedgerCheckpoint! signed, Penghou.Siming.Cryptography.Ed25519CheckpointVerifier! verifier, out Penghou.Siming.LedgerCheckpoint? checkpoint) -> bool

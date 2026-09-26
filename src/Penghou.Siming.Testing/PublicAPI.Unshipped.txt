@@ -1,0 +1,19 @@
+#nullable enable
+override Penghou.Siming.Testing.LedgerProviderConformanceResult.Equals(object? obj) -> bool
+override Penghou.Siming.Testing.LedgerProviderConformanceResult.GetHashCode() -> int
+override Penghou.Siming.Testing.LedgerProviderConformanceResult.ToString() -> string!
+Penghou.Siming.Testing.LedgerProviderConformance
+Penghou.Siming.Testing.LedgerProviderConformanceResult
+Penghou.Siming.Testing.LedgerProviderConformanceResult.<Clone>$() -> Penghou.Siming.Testing.LedgerProviderConformanceResult!
+Penghou.Siming.Testing.LedgerProviderConformanceResult.Checks.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Penghou.Siming.Testing.LedgerProviderConformanceResult.Checks.init -> void
+Penghou.Siming.Testing.LedgerProviderConformanceResult.Deconstruct(out bool Passed, out System.Collections.Generic.IReadOnlyList<string!>! Checks, out string? Failure) -> void
+Penghou.Siming.Testing.LedgerProviderConformanceResult.Equals(Penghou.Siming.Testing.LedgerProviderConformanceResult? other) -> bool
+Penghou.Siming.Testing.LedgerProviderConformanceResult.Failure.get -> string?
+Penghou.Siming.Testing.LedgerProviderConformanceResult.Failure.init -> void
+Penghou.Siming.Testing.LedgerProviderConformanceResult.LedgerProviderConformanceResult(bool Passed, System.Collections.Generic.IReadOnlyList<string!>! Checks, string? Failure = null) -> void
+Penghou.Siming.Testing.LedgerProviderConformanceResult.Passed.get -> bool
+Penghou.Siming.Testing.LedgerProviderConformanceResult.Passed.init -> void
+static Penghou.Siming.Testing.LedgerProviderConformance.RunAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<Penghou.Siming.IAppendOnlyLedger!>>! createLedger, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Siming.Testing.LedgerProviderConformanceResult!>
+static Penghou.Siming.Testing.LedgerProviderConformanceResult.operator !=(Penghou.Siming.Testing.LedgerProviderConformanceResult? left, Penghou.Siming.Testing.LedgerProviderConformanceResult? right) -> bool
+static Penghou.Siming.Testing.LedgerProviderConformanceResult.operator ==(Penghou.Siming.Testing.LedgerProviderConformanceResult? left, Penghou.Siming.Testing.LedgerProviderConformanceResult? right) -> bool

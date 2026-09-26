@@ -1,0 +1,37 @@
+#nullable enable
+override Penghou.Siming.Sqlite.SimingSqliteOptions.Equals(object? obj) -> bool
+override Penghou.Siming.Sqlite.SimingSqliteOptions.GetHashCode() -> int
+override Penghou.Siming.Sqlite.SimingSqliteOptions.ToString() -> string!
+Penghou.Siming.Sqlite.SimingSchemaCompatibilityException
+Penghou.Siming.Sqlite.SimingSchemaCompatibilityException.SimingSchemaCompatibilityException(string! message) -> void
+Penghou.Siming.Sqlite.SimingSchemaCompatibilityException.SimingSchemaCompatibilityException(string! message, System.Exception! innerException) -> void
+Penghou.Siming.Sqlite.SimingSqliteOpenMode
+Penghou.Siming.Sqlite.SimingSqliteOpenMode.ReadOnly = 1 -> Penghou.Siming.Sqlite.SimingSqliteOpenMode
+Penghou.Siming.Sqlite.SimingSqliteOpenMode.ReadWriteCreate = 0 -> Penghou.Siming.Sqlite.SimingSqliteOpenMode
+Penghou.Siming.Sqlite.SimingSqliteOptions
+Penghou.Siming.Sqlite.SimingSqliteOptions.<Clone>$() -> Penghou.Siming.Sqlite.SimingSqliteOptions!
+Penghou.Siming.Sqlite.SimingSqliteOptions.BusyTimeout.get -> System.TimeSpan
+Penghou.Siming.Sqlite.SimingSqliteOptions.BusyTimeout.init -> void
+Penghou.Siming.Sqlite.SimingSqliteOptions.DatabasePath.get -> string!
+Penghou.Siming.Sqlite.SimingSqliteOptions.DatabasePath.init -> void
+Penghou.Siming.Sqlite.SimingSqliteOptions.Equals(Penghou.Siming.Sqlite.SimingSqliteOptions? other) -> bool
+Penghou.Siming.Sqlite.SimingSqliteOptions.InputLimits.get -> Penghou.Siming.LedgerInputLimits!
+Penghou.Siming.Sqlite.SimingSqliteOptions.InputLimits.init -> void
+Penghou.Siming.Sqlite.SimingSqliteOptions.OpenMode.get -> Penghou.Siming.Sqlite.SimingSqliteOpenMode
+Penghou.Siming.Sqlite.SimingSqliteOptions.OpenMode.init -> void
+Penghou.Siming.Sqlite.SimingSqliteOptions.Pooling.get -> bool
+Penghou.Siming.Sqlite.SimingSqliteOptions.Pooling.init -> void
+Penghou.Siming.Sqlite.SimingSqliteOptions.SimingSqliteOptions() -> void
+Penghou.Siming.Sqlite.SqliteAppendOnlyLedger<TSerializer>
+Penghou.Siming.Sqlite.SqliteAppendOnlyLedger<TSerializer>.AppendAsync(Penghou.Siming.LedgerAppendRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerEntry!>
+Penghou.Siming.Sqlite.SqliteAppendOnlyLedger<TSerializer>.AppendAsync<T>(Penghou.Siming.LedgerAppendRequest<T>! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerEntry!>
+Penghou.Siming.Sqlite.SqliteAppendOnlyLedger<TSerializer>.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Penghou.Siming.Sqlite.SqliteAppendOnlyLedger<TSerializer>.GetHeadAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerHead!>
+Penghou.Siming.Sqlite.SqliteAppendOnlyLedger<TSerializer>.ReadAsync(Penghou.Siming.LedgerReadRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Penghou.Siming.LedgerEntry!>!
+Penghou.Siming.Sqlite.SqliteAppendOnlyLedger<TSerializer>.ReadAsync(string? streamId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Penghou.Siming.LedgerEntry!>!
+Penghou.Siming.Sqlite.SqliteAppendOnlyLedger<TSerializer>.ReadByIdempotencyKeyAsync(string! idempotencyKey, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerEntry?>
+Penghou.Siming.Sqlite.SqliteAppendOnlyLedger<TSerializer>.SqliteAppendOnlyLedger(Penghou.Siming.Sqlite.SimingSqliteOptions! options, TSerializer serializer, System.TimeProvider? timeProvider = null) -> void
+Penghou.Siming.Sqlite.SqliteAppendOnlyLedger<TSerializer>.VerifyAsync(Penghou.Siming.LedgerCheckpoint? checkpoint = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerVerificationResult!>
+Penghou.Siming.Sqlite.SqliteAppendOnlyLedger<TSerializer>.VerifyAsync(Penghou.Siming.LedgerCheckpoint? checkpoint, Penghou.Siming.LedgerVerificationOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerVerificationResult!>
+static Penghou.Siming.Sqlite.SimingSqliteOptions.operator !=(Penghou.Siming.Sqlite.SimingSqliteOptions? left, Penghou.Siming.Sqlite.SimingSqliteOptions? right) -> bool
+static Penghou.Siming.Sqlite.SimingSqliteOptions.operator ==(Penghou.Siming.Sqlite.SimingSqliteOptions? left, Penghou.Siming.Sqlite.SimingSqliteOptions? right) -> bool

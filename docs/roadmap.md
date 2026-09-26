@@ -40,7 +40,9 @@ decisions live in the [implementation plan](implementation-plan.md) and
 
 ## Priority 3 — Package readiness
 
-- [ ] Establish public API baselines and compatibility policy.
+- [x] Establish public API baselines and compatibility policy (PublicApiAnalyzers
+  5.6.0 baselines for every packable project; RS0016/RS0017 enforced as build
+  errors).
 - [ ] Complete API usage examples beyond the package README.
 - [ ] Expand CI beyond Linux and establish package/public-API compatibility
   baselines.
