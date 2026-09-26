@@ -13,7 +13,11 @@ const Penghou.Siming.LedgerCheckpoints.MaximumDocumentBytes = 65536 -> int
 const Penghou.Siming.LedgerContext.MaxFieldUtf8Bytes = 256 -> int
 const Penghou.Siming.LedgerFormatV1.Version = 1 -> int
 const Penghou.Siming.LedgerFormatV2.Version = 2 -> int
+const Penghou.Siming.LedgerFormatV3.Suite = "hmac-sha256-v1" -> string!
+const Penghou.Siming.LedgerFormatV3.Version = 3 -> int
 const Penghou.Siming.LedgerHash.Size = 32 -> int
+const Penghou.Siming.LedgerHmacKey.MaxKeyIdUtf8Bytes = 256 -> int
+const Penghou.Siming.LedgerHmacKey.SecretSize = 32 -> int
 const Penghou.Siming.LedgerReadRequest.MaximumLimit = 10000 -> int
 override Penghou.Siming.LedgerAppendRequest.Equals(object? obj) -> bool
 override Penghou.Siming.LedgerAppendRequest.GetHashCode() -> int
@@ -78,7 +82,7 @@ Penghou.Siming.InMemoryAppendOnlyLedger<TSerializer>.AppendAsync<T>(Penghou.Simi
 Penghou.Siming.InMemoryAppendOnlyLedger<TSerializer>.Context.get -> Penghou.Siming.LedgerContext?
 Penghou.Siming.InMemoryAppendOnlyLedger<TSerializer>.DisposeAsync() -> System.Threading.Tasks.ValueTask
 Penghou.Siming.InMemoryAppendOnlyLedger<TSerializer>.GetHeadAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerHead!>
-Penghou.Siming.InMemoryAppendOnlyLedger<TSerializer>.InMemoryAppendOnlyLedger(TSerializer serializer, System.TimeProvider? timeProvider = null, Penghou.Siming.LedgerId? ledgerId = null, Penghou.Siming.LedgerInputLimits? inputLimits = null, Penghou.Siming.LedgerContext? ledgerContext = null) -> void
+Penghou.Siming.InMemoryAppendOnlyLedger<TSerializer>.InMemoryAppendOnlyLedger(TSerializer serializer, System.TimeProvider? timeProvider = null, Penghou.Siming.LedgerId? ledgerId = null, Penghou.Siming.LedgerInputLimits? inputLimits = null, Penghou.Siming.LedgerContext? ledgerContext = null, Penghou.Siming.LedgerHmacKey? hmacKey = null) -> void
 Penghou.Siming.InMemoryAppendOnlyLedger<TSerializer>.LedgerId.get -> Penghou.Siming.LedgerId
 Penghou.Siming.InMemoryAppendOnlyLedger<TSerializer>.ReadAsync(Penghou.Siming.LedgerReadRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Penghou.Siming.LedgerEntry!>!
 Penghou.Siming.InMemoryAppendOnlyLedger<TSerializer>.ReadAsync(string? streamId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Penghou.Siming.LedgerEntry!>!
@@ -124,17 +128,21 @@ Penghou.Siming.LedgerCheckpoint
 Penghou.Siming.LedgerCheckpoint.<Clone>$() -> Penghou.Siming.LedgerCheckpoint!
 Penghou.Siming.LedgerCheckpoint.CreatedAt.get -> System.DateTimeOffset
 Penghou.Siming.LedgerCheckpoint.CreatedAt.init -> void
-Penghou.Siming.LedgerCheckpoint.Deconstruct(out Penghou.Siming.LedgerId LedgerId, out long Sequence, out Penghou.Siming.LedgerHash HeadHash, out System.DateTimeOffset CreatedAt, out int FormatVersion) -> void
+Penghou.Siming.LedgerCheckpoint.Deconstruct(out Penghou.Siming.LedgerId LedgerId, out long Sequence, out Penghou.Siming.LedgerHash HeadHash, out System.DateTimeOffset CreatedAt, out int FormatVersion, out string? Suite, out string? KeyId) -> void
 Penghou.Siming.LedgerCheckpoint.Equals(Penghou.Siming.LedgerCheckpoint? other) -> bool
 Penghou.Siming.LedgerCheckpoint.FormatVersion.get -> int
 Penghou.Siming.LedgerCheckpoint.FormatVersion.init -> void
 Penghou.Siming.LedgerCheckpoint.HeadHash.get -> Penghou.Siming.LedgerHash
 Penghou.Siming.LedgerCheckpoint.HeadHash.init -> void
-Penghou.Siming.LedgerCheckpoint.LedgerCheckpoint(Penghou.Siming.LedgerId LedgerId, long Sequence, Penghou.Siming.LedgerHash HeadHash, System.DateTimeOffset CreatedAt, int FormatVersion) -> void
+Penghou.Siming.LedgerCheckpoint.KeyId.get -> string?
+Penghou.Siming.LedgerCheckpoint.KeyId.init -> void
+Penghou.Siming.LedgerCheckpoint.LedgerCheckpoint(Penghou.Siming.LedgerId LedgerId, long Sequence, Penghou.Siming.LedgerHash HeadHash, System.DateTimeOffset CreatedAt, int FormatVersion, string? Suite = null, string? KeyId = null) -> void
 Penghou.Siming.LedgerCheckpoint.LedgerId.get -> Penghou.Siming.LedgerId
 Penghou.Siming.LedgerCheckpoint.LedgerId.init -> void
 Penghou.Siming.LedgerCheckpoint.Sequence.get -> long
 Penghou.Siming.LedgerCheckpoint.Sequence.init -> void
+Penghou.Siming.LedgerCheckpoint.Suite.get -> string?
+Penghou.Siming.LedgerCheckpoint.Suite.init -> void
 Penghou.Siming.LedgerCheckpoints
 Penghou.Siming.LedgerContext
 Penghou.Siming.LedgerContext.<Clone>$() -> Penghou.Siming.LedgerContext!
@@ -181,6 +189,7 @@ Penghou.Siming.LedgerEntry.StreamId.get -> string!
 Penghou.Siming.LedgerEntry.StreamId.init -> void
 Penghou.Siming.LedgerFormatV1
 Penghou.Siming.LedgerFormatV2
+Penghou.Siming.LedgerFormatV3
 Penghou.Siming.LedgerHash
 Penghou.Siming.LedgerHash.Bytes.get -> System.ReadOnlyMemory<byte>
 Penghou.Siming.LedgerHash.Equals(Penghou.Siming.LedgerHash other) -> bool
@@ -203,6 +212,13 @@ Penghou.Siming.LedgerHeadConflictException
 Penghou.Siming.LedgerHeadConflictException.ActualHead.get -> Penghou.Siming.LedgerHead!
 Penghou.Siming.LedgerHeadConflictException.ExpectedHead.get -> Penghou.Siming.LedgerHead!
 Penghou.Siming.LedgerHeadConflictException.LedgerHeadConflictException(Penghou.Siming.LedgerHead! expectedHead, Penghou.Siming.LedgerHead! actualHead) -> void
+Penghou.Siming.LedgerHmacKey
+Penghou.Siming.LedgerHmacKey.Clear() -> void
+Penghou.Siming.LedgerHmacKey.Dispose() -> void
+Penghou.Siming.LedgerHmacKey.KeyId.get -> string!
+Penghou.Siming.LedgerHmacKey.LedgerHmacKey(string! keyId, System.ReadOnlySpan<byte> secret) -> void
+Penghou.Siming.LedgerHmacKey.Secret.get -> System.ReadOnlyMemory<byte>
+Penghou.Siming.LedgerHmacKey.Validate() -> void
 Penghou.Siming.LedgerId
 Penghou.Siming.LedgerId.Deconstruct(out System.Guid Value) -> void
 Penghou.Siming.LedgerId.Equals(Penghou.Siming.LedgerId other) -> bool
@@ -328,6 +344,7 @@ static Penghou.Siming.LedgerCheckpoints.CaptureAsync(Penghou.Siming.IAppendOnlyL
 static Penghou.Siming.LedgerCheckpoints.Export(Penghou.Siming.LedgerCheckpoint! checkpoint) -> byte[]!
 static Penghou.Siming.LedgerCheckpoints.Import(System.ReadOnlySpan<byte> utf8Json) -> Penghou.Siming.LedgerCheckpoint!
 static Penghou.Siming.LedgerCheckpoints.Import(System.ReadOnlySpan<byte> utf8Json, Penghou.Siming.LedgerContext? context) -> Penghou.Siming.LedgerCheckpoint!
+static Penghou.Siming.LedgerCheckpoints.Import(System.ReadOnlySpan<byte> utf8Json, Penghou.Siming.LedgerContext? context, Penghou.Siming.LedgerHmacKey? key) -> Penghou.Siming.LedgerCheckpoint!
 static Penghou.Siming.LedgerContext.operator !=(Penghou.Siming.LedgerContext? left, Penghou.Siming.LedgerContext? right) -> bool
 static Penghou.Siming.LedgerContext.operator ==(Penghou.Siming.LedgerContext? left, Penghou.Siming.LedgerContext? right) -> bool
 static Penghou.Siming.LedgerEntry.operator !=(Penghou.Siming.LedgerEntry? left, Penghou.Siming.LedgerEntry? right) -> bool
@@ -336,6 +353,8 @@ static Penghou.Siming.LedgerFormatV1.ComputeHash(Penghou.Siming.LedgerId ledgerI
 static Penghou.Siming.LedgerFormatV1.GenesisHash.get -> Penghou.Siming.LedgerHash
 static Penghou.Siming.LedgerFormatV2.ComputeHash(Penghou.Siming.LedgerId ledgerId, long sequence, System.DateTimeOffset committedAt, string! streamId, string! eventType, Penghou.Siming.SerializedLedgerPayload! payload, string? idempotencyKey, Penghou.Siming.LedgerHash previousHash, Penghou.Siming.LedgerContext! context) -> Penghou.Siming.LedgerHash
 static Penghou.Siming.LedgerFormatV2.GenesisHash(Penghou.Siming.LedgerContext! context) -> Penghou.Siming.LedgerHash
+static Penghou.Siming.LedgerFormatV3.ComputeHash(Penghou.Siming.LedgerId ledgerId, long sequence, System.DateTimeOffset committedAt, string! streamId, string! eventType, Penghou.Siming.SerializedLedgerPayload! payload, string? idempotencyKey, Penghou.Siming.LedgerHash previousHash, Penghou.Siming.LedgerContext! context, Penghou.Siming.LedgerHmacKey! key) -> Penghou.Siming.LedgerHash
+static Penghou.Siming.LedgerFormatV3.GenesisHash(Penghou.Siming.LedgerContext! context, Penghou.Siming.LedgerHmacKey! key) -> Penghou.Siming.LedgerHash
 static Penghou.Siming.LedgerHash.operator !=(Penghou.Siming.LedgerHash left, Penghou.Siming.LedgerHash right) -> bool
 static Penghou.Siming.LedgerHash.operator ==(Penghou.Siming.LedgerHash left, Penghou.Siming.LedgerHash right) -> bool
 static Penghou.Siming.LedgerHead.operator !=(Penghou.Siming.LedgerHead? left, Penghou.Siming.LedgerHead? right) -> bool
@@ -356,8 +375,10 @@ static Penghou.Siming.LedgerVerificationResult.operator !=(Penghou.Siming.Ledger
 static Penghou.Siming.LedgerVerificationResult.operator ==(Penghou.Siming.LedgerVerificationResult? left, Penghou.Siming.LedgerVerificationResult? right) -> bool
 static Penghou.Siming.LedgerVerifier.Verify(Penghou.Siming.LedgerId ledgerId, System.Collections.Generic.IReadOnlyList<Penghou.Siming.LedgerEntry!>! entries, Penghou.Siming.LedgerCheckpoint? checkpoint = null) -> Penghou.Siming.LedgerVerificationResult!
 static Penghou.Siming.LedgerVerifier.Verify(Penghou.Siming.LedgerId ledgerId, System.Collections.Generic.IReadOnlyList<Penghou.Siming.LedgerEntry!>! entries, Penghou.Siming.LedgerContext! context, Penghou.Siming.LedgerCheckpoint? checkpoint = null) -> Penghou.Siming.LedgerVerificationResult!
+static Penghou.Siming.LedgerVerifier.Verify(Penghou.Siming.LedgerId ledgerId, System.Collections.Generic.IReadOnlyList<Penghou.Siming.LedgerEntry!>! entries, Penghou.Siming.LedgerContext! context, Penghou.Siming.LedgerHmacKey! key, Penghou.Siming.LedgerCheckpoint? checkpoint = null) -> Penghou.Siming.LedgerVerificationResult!
 static Penghou.Siming.LedgerVerifier.Verify(Penghou.Siming.LedgerId ledgerId, System.Collections.Generic.IReadOnlyList<Penghou.Siming.LedgerEntry!>! entries, Penghou.Siming.LedgerHead! target, Penghou.Siming.LedgerCheckpoint? checkpoint = null) -> Penghou.Siming.LedgerVerificationResult!
 static Penghou.Siming.LedgerVerifier.Verify(Penghou.Siming.LedgerId ledgerId, System.Collections.Generic.IReadOnlyList<Penghou.Siming.LedgerEntry!>! entries, Penghou.Siming.LedgerHead! target, Penghou.Siming.LedgerContext! context, Penghou.Siming.LedgerCheckpoint? checkpoint = null) -> Penghou.Siming.LedgerVerificationResult!
-static Penghou.Siming.LedgerVerifier.VerifyAsync(Penghou.Siming.IAppendOnlyLedger! ledger, Penghou.Siming.LedgerCheckpoint? checkpoint = null, Penghou.Siming.LedgerVerificationOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), Penghou.Siming.LedgerContext? context = null) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerVerificationResult!>
+static Penghou.Siming.LedgerVerifier.Verify(Penghou.Siming.LedgerId ledgerId, System.Collections.Generic.IReadOnlyList<Penghou.Siming.LedgerEntry!>! entries, Penghou.Siming.LedgerHead! target, Penghou.Siming.LedgerContext! context, Penghou.Siming.LedgerHmacKey! key, Penghou.Siming.LedgerCheckpoint? checkpoint = null) -> Penghou.Siming.LedgerVerificationResult!
+static Penghou.Siming.LedgerVerifier.VerifyAsync(Penghou.Siming.IAppendOnlyLedger! ledger, Penghou.Siming.LedgerCheckpoint? checkpoint = null, Penghou.Siming.LedgerVerificationOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), Penghou.Siming.LedgerContext? context = null, Penghou.Siming.LedgerHmacKey? key = null) -> System.Threading.Tasks.ValueTask<Penghou.Siming.LedgerVerificationResult!>
 static Penghou.Siming.SerializedLedgerPayload.operator !=(Penghou.Siming.SerializedLedgerPayload? left, Penghou.Siming.SerializedLedgerPayload? right) -> bool
 static Penghou.Siming.SerializedLedgerPayload.operator ==(Penghou.Siming.SerializedLedgerPayload? left, Penghou.Siming.SerializedLedgerPayload? right) -> bool

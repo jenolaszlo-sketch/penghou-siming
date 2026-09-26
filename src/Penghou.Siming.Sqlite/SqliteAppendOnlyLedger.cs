@@ -17,28 +17,39 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
     private readonly SemaphoreSlim initializationGate = new(1, 1);
     private bool initialized;
     private LedgerId ledgerId;
+    private readonly LedgerHmacKey? hmacKey;
 
-    private int FormatVersion => options.LedgerContext is null
-        ? LedgerFormatV1.Version
-        : LedgerFormatV2.Version;
+    private int FormatVersion => hmacKey is not null
+        ? LedgerFormatV3.Version
+        : options.LedgerContext is null
+            ? LedgerFormatV1.Version
+            : LedgerFormatV2.Version;
 
-    private LedgerHash Genesis => options.LedgerContext is null
-        ? LedgerFormatV1.GenesisHash
-        : LedgerFormatV2.GenesisHash(options.LedgerContext);
+    private LedgerHash Genesis => hmacKey is not null
+        ? LedgerFormatV3.GenesisHash(options.LedgerContext!, hmacKey)
+        : options.LedgerContext is null
+            ? LedgerFormatV1.GenesisHash
+            : LedgerFormatV2.GenesisHash(options.LedgerContext);
 
     /// <summary>Creates a SQLite ledger provider with explicit serializer and access options.</summary>
     public SqliteAppendOnlyLedger(
         SimingSqliteOptions options,
         TSerializer serializer,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        LedgerHmacKey? hmacKey = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.DatabasePath);
         ArgumentNullException.ThrowIfNull(options.InputLimits);
         options.InputLimits.Validate();
         options.LedgerContext?.Validate();
+        hmacKey?.Validate();
+        if (hmacKey is not null && options.LedgerContext is null)
+            throw new ArgumentException(
+                "A keyed suite requires a ledger context.", nameof(hmacKey));
         this.options = options;
         this.serializer = serializer;
+        this.hmacKey = hmacKey;
         this.timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -46,8 +57,9 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         SimingSqliteOptions options,
         TSerializer serializer,
         Func<SqliteAppendFaultPoint, CancellationToken, ValueTask> appendFault,
-        TimeProvider? timeProvider = null)
-        : this(options, serializer, timeProvider) =>
+        TimeProvider? timeProvider = null,
+        LedgerHmacKey? hmacKey = null)
+        : this(options, serializer, timeProvider, hmacKey) =>
         this.appendFault = appendFault;
 
     /// <inheritdoc />
@@ -149,17 +161,8 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         var committedAt = DateTimeOffset.FromUnixTimeMilliseconds(
             timeProvider.GetUtcNow().ToUnixTimeMilliseconds());
         var definitivePayload = payload with { Bytes = payload.Bytes.ToArray() };
-        var hash = options.LedgerContext is null
-            ? LedgerFormatV1.ComputeHash(
-                ledgerId,
-                nextSequence,
-                committedAt,
-                streamId,
-                eventType,
-                definitivePayload,
-                idempotencyKey,
-                previous)
-            : LedgerFormatV2.ComputeHash(
+        var hash = hmacKey is not null
+            ? LedgerFormatV3.ComputeHash(
                 ledgerId,
                 nextSequence,
                 committedAt,
@@ -168,7 +171,28 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
                 definitivePayload,
                 idempotencyKey,
                 previous,
-                options.LedgerContext);
+                options.LedgerContext!,
+                hmacKey)
+            : options.LedgerContext is null
+                ? LedgerFormatV1.ComputeHash(
+                    ledgerId,
+                    nextSequence,
+                    committedAt,
+                    streamId,
+                    eventType,
+                    definitivePayload,
+                    idempotencyKey,
+                    previous)
+                : LedgerFormatV2.ComputeHash(
+                    ledgerId,
+                    nextSequence,
+                    committedAt,
+                    streamId,
+                    eventType,
+                    definitivePayload,
+                    idempotencyKey,
+                    previous,
+                    options.LedgerContext);
 
         await InjectAsync(
             SqliteAppendFaultPoint.BeforeInsert,
@@ -337,7 +361,8 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             checkpoint,
             options,
             cancellationToken,
-            this.options.LedgerContext).ConfigureAwait(false);
+            this.options.LedgerContext,
+            hmacKey).ConfigureAwait(false);
         transaction.Commit();
         return result;
     }

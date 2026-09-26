@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 
 namespace Penghou.Siming.Tests;
 
@@ -51,29 +52,36 @@ public sealed class LedgerContextTests
         Assert.Equal(first, repeat);
         Assert.NotEqual(first, other);
         Assert.NotEqual(LedgerFormatV1.GenesisHash, first);
+        Assert.Equal(
+            "e427d555bcaff8c73b11468073adc036440e918e9603eda3820c6f9fa23b7ccf",
+            first.ToString());
     }
 
     [Fact]
-    public void V2_RowHash_IsStableAndBoundToContext()
+    public void V2_VectorFile_RecomputesDigestGenesisAndRow()
     {
-        var hash = LedgerFormatV2.ComputeHash(
-            new LedgerId(Guid.Parse("00112233-4455-6677-8899-aabbccddeeff")),
-            1,
-            DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_000_123),
-            "session-1",
-            "SessionStarted",
-            new SerializedLedgerPayload(
-                new byte[] { 1 },
-                "application/octet-stream",
-                "raw",
-                1),
-            null,
-            LedgerFormatV2.GenesisHash(TestContext),
-            TestContext);
+        var vector = ReadLedgerFormatVector("ledger-format-v2.json");
+        var context = ContextFrom(vector);
 
-        Assert.Equal(
-            "f8c7fc5beac434819cb15a90a19adfb5d622c06d4162fff17841dddc0ddc1257",
-            hash.ToString());
+        Assert.Equal(vector.ExpectedContextDigestHex, context.ComputeDigest().ToString());
+        Assert.Equal(vector.ExpectedGenesisHex, LedgerFormatV2.GenesisHash(context).ToString());
+
+        var hash = LedgerFormatV2.ComputeHash(
+            new LedgerId(Guid.Parse(vector.LedgerId)),
+            vector.Sequence,
+            DateTimeOffset.FromUnixTimeMilliseconds(vector.CommittedAtUnixMilliseconds),
+            vector.StreamId,
+            vector.EventType,
+            new SerializedLedgerPayload(
+                Convert.FromBase64String(vector.PayloadBase64),
+                vector.ContentType,
+                vector.SerializationFormat,
+                vector.SerializationVersion),
+            vector.IdempotencyKey,
+            LedgerFormatV2.GenesisHash(context),
+            context);
+
+        Assert.Equal(vector.ExpectedHashHex, hash.ToString());
     }
 
     [Fact]
@@ -169,4 +177,37 @@ public sealed class LedgerContextTests
             Penghou.Siming.Cryptography.SignedLedgerCheckpoints.Verify(
                 imported, verifier, out _));
     }
+
+    internal static LedgerContext ContextFrom(LedgerFormatVector vector) => new()
+    {
+        Application = vector.Context["application"],
+        Environment = vector.Context["environment"],
+        Tenant = vector.Context["tenant"],
+        Deployment = vector.Context["deployment"]
+    };
+
+    internal static LedgerFormatVector ReadLedgerFormatVector(string fileName) =>
+        JsonSerializer.Deserialize<LedgerFormatVector>(
+            File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "vectors", fileName)),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+
+    internal sealed record LedgerFormatVector(
+        int FormatVersion,
+        Dictionary<string, string?> Context,
+        string? Suite,
+        string? KeyId,
+        string? SecretHex,
+        string LedgerId,
+        long Sequence,
+        long CommittedAtUnixMilliseconds,
+        string StreamId,
+        string EventType,
+        string ContentType,
+        string SerializationFormat,
+        int SerializationVersion,
+        string PayloadBase64,
+        string? IdempotencyKey,
+        string ExpectedContextDigestHex,
+        string ExpectedGenesisHex,
+        string ExpectedHashHex);
 }

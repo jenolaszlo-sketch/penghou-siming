@@ -7,7 +7,9 @@ integer/string operations matching the documented contract.
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
 import json
 import re
 import struct
@@ -210,16 +212,102 @@ def verify_v2(root: Path) -> int:
     return len(vectors)
 
 
+CONTEXT_FIELDS = ("application", "environment", "tenant", "deployment")
+
+
+def context_digest(context: dict[str, Any]) -> bytes:
+    parts = [b"penghou-siming-ledger-context-v1\0"]
+    for name in CONTEXT_FIELDS:
+        value = context.get(name)
+        if value is None:
+            parts.append(b"\x00")
+        else:
+            raw = value.encode("utf-8")
+            parts.append(b"\x01" + struct.pack(">i", len(raw)) + raw)
+    return hashlib.sha256(b"".join(parts)).digest()
+
+
+def encode_row(vector: dict[str, Any], previous: bytes) -> bytes:
+    payload = base64.b64decode(vector["payloadBase64"])
+    return b"".join(
+        [
+            struct.pack(">i", vector["formatVersion"]),
+            uuid.UUID(vector["ledgerId"]).bytes,
+            struct.pack(">q", vector["sequence"]),
+            struct.pack(">q", vector["committedAtUnixMilliseconds"]),
+            sized(vector["streamId"].encode("utf-8")),
+            sized(vector["eventType"].encode("utf-8")),
+            sized(vector["contentType"].encode("utf-8")),
+            sized(vector["serializationFormat"].encode("utf-8")),
+            struct.pack(">i", vector["serializationVersion"]),
+            sized(payload),
+            struct.pack(">i", -1)
+            if vector["idempotencyKey"] is None
+            else sized(vector["idempotencyKey"].encode("utf-8")),
+            previous,
+        ]
+    )
+
+
+def verify_ledger_v2(root: Path) -> str:
+    vector = json.loads((root / "vectors" / "ledger-format-v2.json").read_text(encoding="utf-8"))
+    digest = context_digest(vector["context"])
+    if digest.hex() != vector["expectedContextDigestHex"]:
+        raise ValueError(f"epoch-2 digest mismatch: {digest.hex()}")
+    genesis = hashlib.sha256(b"penghou-siming-ledger-v2\0" + digest).digest()
+    if genesis.hex() != vector["expectedGenesisHex"]:
+        raise ValueError(f"epoch-2 genesis mismatch: {genesis.hex()}")
+    actual = hashlib.sha256(encode_row(vector, genesis) + digest).hexdigest()
+    if actual != vector["expectedHashHex"]:
+        raise ValueError(f"epoch-2 expected={vector['expectedHashHex']} actual={actual}")
+    return actual
+
+
+def verify_ledger_v3(root: Path) -> str:
+    vector = json.loads((root / "vectors" / "ledger-format-v3.json").read_text(encoding="utf-8"))
+    if vector["suite"] != "hmac-sha256-v1":
+        raise ValueError(f"unexpected suite: {vector['suite']}")
+    digest = context_digest(vector["context"])
+    if digest.hex() != vector["expectedContextDigestHex"]:
+        raise ValueError(f"epoch-3 digest mismatch: {digest.hex()}")
+    secret = bytes.fromhex(vector["secretHex"])
+    genesis = hmac.new(
+        secret,
+        b"penghou-siming-ledger-v3-genesis\0"
+        + sized(vector["suite"].encode("utf-8"))
+        + sized(vector["keyId"].encode("utf-8"))
+        + digest,
+        hashlib.sha256,
+    ).digest()
+    if genesis.hex() != vector["expectedGenesisHex"]:
+        raise ValueError(f"epoch-3 genesis mismatch: {genesis.hex()}")
+    message = (
+        b"penghou-siming-ledger-v3-row\0"
+        + sized(vector["suite"].encode("utf-8"))
+        + sized(vector["keyId"].encode("utf-8"))
+        + encode_row(vector, genesis)
+        + digest
+    )
+    actual = hmac.new(secret, message, hashlib.sha256).hexdigest()
+    if actual != vector["expectedHashHex"]:
+        raise ValueError(f"epoch-3 expected={vector['expectedHashHex']} actual={actual}")
+    return actual
+
+
 def main() -> int:
     root = Path(__file__).parents[1]
     try:
         v1_hash = verify_v1(root)
         v2_count = verify_v2(root)
+        epoch2_hash = verify_ledger_v2(root)
+        epoch3_hash = verify_ledger_v3(root)
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
         print(f"FAIL {error}")
         return 1
     print(f"PASS Penghou.Siming v1 golden vector: {v1_hash}")
     print(f"PASS Penghou.Siming v2 canonical JSON vectors: {v2_count}")
+    print(f"PASS Penghou.Siming epoch-2 golden vector: {epoch2_hash}")
+    print(f"PASS Penghou.Siming epoch-3 golden vector: {epoch3_hash}")
     return 0
 
 

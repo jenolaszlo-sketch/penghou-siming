@@ -176,6 +176,66 @@ public sealed class VerifierCliTests : IDisposable
         Assert.Equal("InvalidInput", result.RootElement.GetProperty("failure").GetString());
     }
 
+    [Fact]
+    public async Task VerifyDatabase_AcceptsHmacFlagsForKeyedLedgers()
+    {
+        Directory.CreateDirectory(root);
+        var database = Path.Combine(root, "keyed.db");
+        var keyPath = Path.Combine(root, "hmac.key");
+        var secret = Enumerable.Range(1, 32).Select(index => (byte)index).ToArray();
+        await File.WriteAllBytesAsync(keyPath, secret);
+        var options = new SimingSqliteOptions
+        {
+            DatabasePath = database,
+            Pooling = false,
+            LedgerContext = new LedgerContext { Application = "marang", Environment = "test" }
+        };
+        await using (var ledger = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            options, new(), hmacKey: new LedgerHmacKey("ops-2026", secret)))
+            await ledger.AppendAsync(new LedgerAppendRequest("s", "one", new byte[] { 1 }));
+        using var output = new StringWriter();
+
+        var exitCode = await Program.RunAsync(
+            [database, "--context-application", "marang", "--context-environment", "test",
+                "--hmac-key-file", keyPath, "--hmac-key-id", "ops-2026"],
+            output, TextWriter.Null, CancellationToken.None);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"valid\":true", output.ToString());
+    }
+
+    [Fact]
+    public async Task VerifyDatabase_RejectsWrongHmacSecret()
+    {
+        Directory.CreateDirectory(root);
+        var database = Path.Combine(root, "keyed-wrong.db");
+        var keyPath = Path.Combine(root, "hmac-wrong.key");
+        await File.WriteAllBytesAsync(
+            keyPath,
+            Enumerable.Range(101, 132).Take(32).Select(index => (byte)index).ToArray());
+        await using (var ledger = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            new SimingSqliteOptions
+            {
+                DatabasePath = database,
+                Pooling = false,
+                LedgerContext = new LedgerContext { Application = "marang" }
+            },
+            new(),
+            hmacKey: new LedgerHmacKey(
+                "ops-2026",
+                Enumerable.Range(1, 32).Select(index => (byte)index).ToArray())))
+            await ledger.AppendAsync(new LedgerAppendRequest("s", "one", new byte[] { 1 }));
+        using var output = new StringWriter();
+
+        var exitCode = await Program.RunAsync(
+            [database, "--context-application", "marang",
+                "--hmac-key-file", keyPath, "--hmac-key-id", "ops-2026"],
+            output, TextWriter.Null, CancellationToken.None);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("\"valid\":false", output.ToString());
+    }
+
     private static SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer> Create(
         string database) => new(
             new SimingSqliteOptions { DatabasePath = database, Pooling = false }, new());

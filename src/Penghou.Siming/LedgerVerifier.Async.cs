@@ -8,7 +8,8 @@ public static partial class LedgerVerifier
         LedgerCheckpoint? checkpoint = null,
         LedgerVerificationOptions? options = null,
         CancellationToken cancellationToken = default,
-        LedgerContext? context = null)
+        LedgerContext? context = null,
+        LedgerHmacKey? key = null)
     {
         ArgumentNullException.ThrowIfNull(ledger);
         options ??= new LedgerVerificationOptions();
@@ -22,7 +23,8 @@ public static partial class LedgerVerifier
             checkpoint,
             options,
             cancellationToken,
-            context).ConfigureAwait(false);
+            context,
+            key).ConfigureAwait(false);
     }
 
     internal static async ValueTask<LedgerVerificationResult> VerifySnapshotAsync(
@@ -31,12 +33,13 @@ public static partial class LedgerVerifier
         LedgerCheckpoint? checkpoint,
         LedgerVerificationOptions options,
         CancellationToken cancellationToken,
-        LedgerContext? context = null)
+        LedgerContext? context = null,
+        LedgerHmacKey? key = null)
     {
         ArgumentNullException.ThrowIfNull(read);
         options.Validate();
         cancellationToken.ThrowIfCancellationRequested();
-        var state = new State(target.LedgerId, checkpoint, options.Progress, context);
+        var state = new State(target.LedgerId, checkpoint, options.Progress, context, key);
         var start = state.Start(target);
         if (start is not null) return start;
         var verifiedEntries = new List<LedgerEntry>(options.PageSize);
@@ -73,9 +76,12 @@ public static partial class LedgerVerifier
             LedgerEntry entry,
             long expectedSequence,
             LedgerHash previous,
-            LedgerContext? context)
+            LedgerContext? context,
+            LedgerHmacKey? key = null)
     {
-        var formatVersion = context is null ? LedgerFormatV1.Version : LedgerFormatV2.Version;
+        var formatVersion = key is not null
+            ? LedgerFormatV3.Version
+            : context is null ? LedgerFormatV1.Version : LedgerFormatV2.Version;
         if (entry.FormatVersion != formatVersion)
             return (LedgerVerificationFailure.UnsupportedVersion,
                 $"Format version {entry.FormatVersion} is unsupported in epoch {formatVersion}.");
@@ -89,13 +95,17 @@ public static partial class LedgerVerifier
                 "The previous hash does not match the verified chain head.");
         var payload = new SerializedLedgerPayload(entry.Payload, entry.ContentType,
             entry.SerializationFormat, entry.SerializationVersion);
-        var calculated = context is null
-            ? LedgerFormatV1.ComputeHash(
+        var calculated = key is not null
+            ? LedgerFormatV3.ComputeHash(
                 ledgerId, entry.Sequence, entry.CommittedAt, entry.StreamId,
-                entry.EventType, payload, entry.IdempotencyKey, previous)
-            : LedgerFormatV2.ComputeHash(
-                ledgerId, entry.Sequence, entry.CommittedAt, entry.StreamId,
-                entry.EventType, payload, entry.IdempotencyKey, previous, context);
+                entry.EventType, payload, entry.IdempotencyKey, previous, context!, key)
+            : context is null
+                ? LedgerFormatV1.ComputeHash(
+                    ledgerId, entry.Sequence, entry.CommittedAt, entry.StreamId,
+                    entry.EventType, payload, entry.IdempotencyKey, previous)
+                : LedgerFormatV2.ComputeHash(
+                    ledgerId, entry.Sequence, entry.CommittedAt, entry.StreamId,
+                    entry.EventType, payload, entry.IdempotencyKey, previous, context);
         return calculated == entry.Hash
             ? null
             : (LedgerVerificationFailure.RowHashMismatch,

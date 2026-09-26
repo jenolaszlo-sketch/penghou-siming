@@ -93,7 +93,7 @@ public sealed record LedgerEntry(long Sequence, string StreamId, DateTimeOffset 
 /// <summary>Identity and hash of a ledger's current tail.</summary>
 public sealed record LedgerHead(LedgerId LedgerId, long Sequence, LedgerHash Hash, int FormatVersion);
 /// <summary>Portable externally retainable trusted ledger head.</summary>
-public sealed record LedgerCheckpoint(LedgerId LedgerId, long Sequence, LedgerHash HeadHash, DateTimeOffset CreatedAt, int FormatVersion);
+public sealed record LedgerCheckpoint(LedgerId LedgerId, long Sequence, LedgerHash HeadHash, DateTimeOffset CreatedAt, int FormatVersion, string? Suite = null, string? KeyId = null);
 
 /// <summary>Classifies a verification failure.</summary>
 public enum LedgerVerificationFailure

@@ -69,11 +69,51 @@ public static partial class LedgerVerifier
         return state.Complete(target);
     }
 
+    /// <summary>Verifies an in-memory complete keyed-suite ledger representation.</summary>
+    public static LedgerVerificationResult Verify(LedgerId ledgerId, IReadOnlyList<LedgerEntry> entries, LedgerContext context, LedgerHmacKey key, LedgerCheckpoint? checkpoint = null)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(key);
+        context.Validate();
+        key.Validate();
+        var state = new State(ledgerId, checkpoint, null, context, key);
+        var start = state.Start(null);
+        if (start is not null) return start;
+        foreach (var entry in entries)
+        {
+            var failure = state.Accept(entry);
+            if (failure is not null) return failure;
+        }
+        return state.Complete(null);
+    }
+
+    /// <summary>Verifies an in-memory keyed-suite snapshot against an independently captured head and checkpoint.</summary>
+    public static LedgerVerificationResult Verify(LedgerId ledgerId, IReadOnlyList<LedgerEntry> entries, LedgerHead target, LedgerContext context, LedgerHmacKey key, LedgerCheckpoint? checkpoint = null)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(key);
+        context.Validate();
+        key.Validate();
+        var state = new State(ledgerId, checkpoint, null, context, key);
+        var start = state.Start(target);
+        if (start is not null) return start;
+        foreach (var entry in entries)
+        {
+            var failure = state.Accept(entry);
+            if (failure is not null) return failure;
+        }
+        return state.Complete(target);
+    }
+
     /// <summary>
     /// Incremental verification state machine shared by synchronous and
     /// asynchronous verification, with snapshot and head diagnostics.
-    /// A null context verifies the epoch-1 chain; a context verifies the
-    /// context-bound epoch-2 chain. Epochs never mix within one verification.
+    /// Epochs never mix within one verification: a null context verifies the
+    /// epoch-1 chain, a context alone verifies epoch 2, and a context plus a
+    /// key verifies the keyed epoch-3 suite.
     /// </summary>
     private sealed class State
     {
@@ -81,6 +121,7 @@ public static partial class LedgerVerifier
         private readonly LedgerCheckpoint? checkpoint;
         private readonly IProgress<LedgerVerificationProgress>? progress;
         private readonly LedgerContext? context;
+        private readonly LedgerHmacKey? key;
         private readonly int formatVersion;
         private readonly LedgerHash genesis;
         private LedgerHash previous;
@@ -91,16 +132,27 @@ public static partial class LedgerVerifier
             LedgerId ledgerId,
             LedgerCheckpoint? checkpoint,
             IProgress<LedgerVerificationProgress>? progress,
-            LedgerContext? context = null)
+            LedgerContext? context = null,
+            LedgerHmacKey? key = null)
         {
+            context?.Validate();
+            key?.Validate();
+            if (key is not null && context is null)
+                throw new ArgumentException(
+                    "A keyed suite requires a ledger context.", nameof(key));
             this.ledgerId = ledgerId;
             this.checkpoint = checkpoint;
             this.progress = progress;
             this.context = context;
-            formatVersion = context is null ? LedgerFormatV1.Version : LedgerFormatV2.Version;
-            genesis = context is null
-                ? LedgerFormatV1.GenesisHash
-                : LedgerFormatV2.GenesisHash(context);
+            this.key = key;
+            formatVersion = key is not null
+                ? LedgerFormatV3.Version
+                : context is null ? LedgerFormatV1.Version : LedgerFormatV2.Version;
+            genesis = key is not null
+                ? LedgerFormatV3.GenesisHash(context!, key)
+                : context is null
+                    ? LedgerFormatV1.GenesisHash
+                    : LedgerFormatV2.GenesisHash(context);
             previous = genesis;
             checkpointHash = checkpoint?.Sequence == 0 ? genesis : null;
         }
@@ -119,6 +171,14 @@ public static partial class LedgerVerifier
             if (checkpoint is not null && checkpoint.FormatVersion != formatVersion)
                 return StartFailure(checkpoint.Sequence, LedgerVerificationFailure.UnsupportedVersion,
                     $"The checkpoint targets format version {checkpoint.FormatVersion}; this verification expects epoch {formatVersion}.");
+            if (checkpoint is not null && key is not null &&
+                (checkpoint.Suite != LedgerFormatV3.Suite || checkpoint.KeyId != key.KeyId))
+                return StartFailure(checkpoint.Sequence, LedgerVerificationFailure.LedgerIdentityMismatch,
+                    "The checkpoint suite binding does not match the verification key.");
+            if (checkpoint is not null && key is null &&
+                (checkpoint.Suite is not null || checkpoint.KeyId is not null))
+                return StartFailure(checkpoint.Sequence, LedgerVerificationFailure.LedgerIdentityMismatch,
+                    "The checkpoint carries a suite binding for an unkeyed verification.");
             if (target is not null && checkpoint is not null && checkpoint.Sequence > target.Sequence)
                 return StartFailure(checkpoint.Sequence, LedgerVerificationFailure.CheckpointSequenceMismatch,
                     "The ledger does not extend to the checkpoint sequence.");
@@ -132,7 +192,7 @@ public static partial class LedgerVerifier
         /// <summary>Verifies and advances over one entry, or returns the failure.</summary>
         public LedgerVerificationResult? Accept(LedgerEntry entry)
         {
-            var failure = VerifyIncrementalEntry(ledgerId, entry, verified + 1, previous, context);
+            var failure = VerifyIncrementalEntry(ledgerId, entry, verified + 1, previous, context, key);
             if (failure is not null)
                 return new(false, verified, CurrentHead, entry.Sequence,
                     failure.Value.Failure, failure.Value.Detail);

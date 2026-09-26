@@ -115,20 +115,47 @@ not prove actor identity, timestamp accuracy, payload truth, or authorization.
   identifier are persisted, so rotation, availability, backup, and recovery are
   operational responsibilities of the host.
 
+## Epoch 3: keyed suite
+
+Format v3 (`hmac-sha256-v1`) streams the epoch-2 row envelope through
+HMAC-SHA256 under an external 32-byte secret. The suite identity, key
+identifier, and context digest are bound alongside every field; the v3 genesis
+binds the same values. The committed v3 golden vector lives in
+`vectors/ledger-format-v3.json` and is recomputed independently by
+`tools/verify_golden_vectors.py`:
+
+```text
+bc442eddccd5c06583c08a5d318056b580cbf3eb81627676fe4dcbb118b1aee8
+```
+
+Key rules:
+
+- The secret is exactly 32 bytes, held externally, and never persisted by
+  Siming. Only the suite identity (as format version 3) and the key identifier
+  (in checkpoint envelopes and diagnostics) are retained.
+- Verification requires the exact secret, context, and key identifier. A wrong
+  secret fails as a hash mismatch; a wrong key identifier fails as an identity
+  mismatch against the checkpoint binding. A key without a context is
+  rejected; unkeyed epochs never accept keyed material.
+- Rotation assigns a new key identifier and begins a new ledger epoch. The old
+  key must be retained to verify old history; a lost key makes that history
+  unverifiable without ever silently falling back to unkeyed verification.
+- Backup covers the secret separately from the database under the host's key
+  management. Recovery restores both; verification availability depends on
+  both.
+
 ## Planned epoch changes
 
-Optional keyed suites require a new format/ledger epoch and
+Further suites require a new format/ledger epoch and
 never reinterpret committed rows.
 
 - **Public ledger-context binding (implemented as epoch 2).** See
   "Epoch 2: context-bound rows" above.
-- **Optional keyed suite `hmac-sha256-v1`.** A future suite authenticates rows
-  with an external secret while persisting only the suite identity and key
-  identifier. A lost or rotated key must never silently fall back to unkeyed
-  verification; unavailable key material is reported as a verification failure.
+- **Keyed suite `hmac-sha256-v1` (implemented as epoch 3).** See
+  "Epoch 3: keyed suite" above.
 - Independent golden vectors must be published for every keyed
-  suite before it is declared supported. The epoch-2 vector above is the
-  first context-bound vector.
+  suite before it is declared supported. Epoch-2 and epoch-3 vectors are
+  published in `vectors/` and verified independently.
 - **Envelope schema identity decision.** The ledger envelope does not currently
   commit an application schema identity; the canonical JSON payload carries its
   own contract name and version. If an application schema identity is added, it

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using Penghou.Siming.Cryptography;
 using Penghou.Siming.Sqlite;
@@ -35,6 +36,7 @@ public static class Program
         TextWriter error,
         CancellationToken cancellationToken)
     {
+        LedgerHmacKey? hmacKey = null;
         try
         {
             if (args.Count == 0 || args[0] is "--help" or "-h")
@@ -55,6 +57,8 @@ public static class Program
             string? contextEnvironment = null;
             string? contextTenant = null;
             string? contextDeployment = null;
+            string? hmacKeyPath = null;
+            string? hmacKeyId = null;
             var pageSize = 1_000;
             for (var index = 1; index < args.Count; index += 2)
             {
@@ -71,6 +75,8 @@ public static class Program
                     case "--context-environment": contextEnvironment = args[index + 1]; break;
                     case "--context-tenant": contextTenant = args[index + 1]; break;
                     case "--context-deployment": contextDeployment = args[index + 1]; break;
+                    case "--hmac-key-file": hmacKeyPath = args[index + 1]; break;
+                    case "--hmac-key-id": hmacKeyId = args[index + 1]; break;
                     default: throw new ArgumentException($"Unknown option '{args[index]}'.");
                 }
             }
@@ -89,6 +95,26 @@ public static class Program
                         Deployment = contextDeployment
                     };
             context?.Validate();
+            if (hmacKeyPath is not null || hmacKeyId is not null)
+            {
+                if (hmacKeyPath is null || string.IsNullOrWhiteSpace(hmacKeyId))
+                    throw new ArgumentException(
+                        "--hmac-key-file requires --hmac-key-id.");
+                if (context is null)
+                    throw new ArgumentException(
+                        "A keyed suite requires a ledger context (--context-*).");
+                var secret = await ReadBoundedAsync(
+                        hmacKeyPath, 4096, "HMAC key", cancellationToken)
+                    .ConfigureAwait(false);
+                try
+                {
+                    hmacKey = new LedgerHmacKey(hmacKeyId, secret);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(secret);
+                }
+            }
 
             LedgerCheckpoint? checkpoint = null;
             if (checkpointPath is not null)
@@ -96,7 +122,8 @@ public static class Program
                     await ReadBoundedAsync(checkpointPath,
                         LedgerCheckpoints.MaximumDocumentBytes, "checkpoint", cancellationToken)
                         .ConfigureAwait(false),
-                    context);
+                    context,
+                    hmacKey);
             if (signedCheckpointPath is not null)
             {
                 if (publicKeyPath is null || string.IsNullOrWhiteSpace(keyId))
@@ -111,7 +138,7 @@ public static class Program
                         .ConfigureAwait(false),
                     keyId);
                 keyFingerprint = verifier.Fingerprint;
-                if (!SignedLedgerCheckpoints.Verify(signed, verifier, context, out checkpoint))
+                if (!SignedLedgerCheckpoints.Verify(signed, verifier, context, hmacKey, out checkpoint))
                 {
                     await WriteResultAsync(output, new
                     {
@@ -130,7 +157,7 @@ public static class Program
                         DatabasePath = database,
                         OpenMode = SimingSqliteOpenMode.ReadOnly,
                         LedgerContext = context
-                    }, new());
+                    }, new(), hmacKey: hmacKey);
             var progress = new TextProgress(error);
             var result = await ledger.VerifyAsync(
                 checkpoint, new LedgerVerificationOptions(pageSize, progress),
@@ -160,6 +187,10 @@ public static class Program
         {
             await WriteErrorAsync(error, exception.Message).ConfigureAwait(false);
             return 2;
+        }
+        finally
+        {
+            hmacKey?.Clear();
         }
     }
 
@@ -202,6 +233,8 @@ public static class Program
           --context-environment <id>   Ledger-context environment identity.
           --context-tenant <id>        Ledger-context tenant identity.
           --context-deployment <id>    Ledger-context deployment identity.
+          --hmac-key-file <file>       Raw 32-byte HMAC suite key (epoch-3 ledgers).
+          --hmac-key-id <id>           Keyed-suite key identifier.
         Results and input errors are printed as machine-readable JSON.
         Signed-checkpoint runs report the verified key fingerprint.
         Exit codes: 0 valid, 1 verification failed, 2 usage/input error, 130 cancelled.

@@ -12,22 +12,32 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
     private readonly TimeProvider timeProvider;
     private readonly LedgerInputLimits inputLimits;
     private readonly LedgerContext? ledgerContext;
+    private readonly LedgerHmacKey? hmacKey;
     private readonly int formatVersion;
     private readonly LedgerHash genesis;
 
     /// <summary>Creates an in-memory ledger.</summary>
-    public InMemoryAppendOnlyLedger(TSerializer serializer, TimeProvider? timeProvider = null, LedgerId? ledgerId = null, LedgerInputLimits? inputLimits = null, LedgerContext? ledgerContext = null)
+    public InMemoryAppendOnlyLedger(TSerializer serializer, TimeProvider? timeProvider = null, LedgerId? ledgerId = null, LedgerInputLimits? inputLimits = null, LedgerContext? ledgerContext = null, LedgerHmacKey? hmacKey = null)
     {
         this.serializer = serializer;
         this.timeProvider = timeProvider ?? TimeProvider.System;
         this.inputLimits = inputLimits ?? LedgerInputLimits.Default;
         this.inputLimits.Validate();
         this.ledgerContext = ledgerContext;
+        this.hmacKey = hmacKey;
         ledgerContext?.Validate();
-        formatVersion = ledgerContext is null ? LedgerFormatV1.Version : LedgerFormatV2.Version;
-        genesis = ledgerContext is null
-            ? LedgerFormatV1.GenesisHash
-            : LedgerFormatV2.GenesisHash(ledgerContext);
+        hmacKey?.Validate();
+        if (hmacKey is not null && ledgerContext is null)
+            throw new ArgumentException(
+                "A keyed suite requires a ledger context.", nameof(hmacKey));
+        formatVersion = hmacKey is not null
+            ? LedgerFormatV3.Version
+            : ledgerContext is null ? LedgerFormatV1.Version : LedgerFormatV2.Version;
+        genesis = hmacKey is not null
+            ? LedgerFormatV3.GenesisHash(ledgerContext!, hmacKey)
+            : ledgerContext is null
+                ? LedgerFormatV1.GenesisHash
+                : LedgerFormatV2.GenesisHash(ledgerContext);
         LedgerId = ledgerId ?? Penghou.Siming.LedgerId.New();
     }
 
@@ -85,9 +95,11 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
             var committedAt = DateTimeOffset.FromUnixTimeMilliseconds(
                 timeProvider.GetUtcNow().ToUnixTimeMilliseconds());
             var definitivePayload = payload with { Bytes = payload.Bytes.ToArray() };
-            var hash = ledgerContext is null
-                ? LedgerFormatV1.ComputeHash(LedgerId, sequence, committedAt, streamId, eventType, definitivePayload, idempotencyKey, previous)
-                : LedgerFormatV2.ComputeHash(LedgerId, sequence, committedAt, streamId, eventType, definitivePayload, idempotencyKey, previous, ledgerContext);
+            var hash = hmacKey is not null
+                ? LedgerFormatV3.ComputeHash(LedgerId, sequence, committedAt, streamId, eventType, definitivePayload, idempotencyKey, previous, ledgerContext!, hmacKey)
+                : ledgerContext is null
+                    ? LedgerFormatV1.ComputeHash(LedgerId, sequence, committedAt, streamId, eventType, definitivePayload, idempotencyKey, previous)
+                    : LedgerFormatV2.ComputeHash(LedgerId, sequence, committedAt, streamId, eventType, definitivePayload, idempotencyKey, previous, ledgerContext);
             var entry = new LedgerEntry(sequence, streamId, committedAt, eventType, definitivePayload.ContentType, definitivePayload.SerializationFormat, definitivePayload.SerializationVersion, definitivePayload.Bytes, idempotencyKey, previous, hash, formatVersion);
             entries.Add(entry);
             if (idempotencyKey is not null) idempotentEntries.Add(idempotencyKey, entry);
@@ -137,7 +149,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
     public async ValueTask<LedgerVerificationResult> VerifyAsync(LedgerCheckpoint? checkpoint = null, CancellationToken cancellationToken = default)
     {
         return await LedgerVerifier.VerifyAsync(
-            this, checkpoint, cancellationToken: cancellationToken, context: ledgerContext).ConfigureAwait(false);
+            this, checkpoint, cancellationToken: cancellationToken, context: ledgerContext, key: hmacKey).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

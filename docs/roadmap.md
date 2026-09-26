@@ -37,13 +37,16 @@ decisions live in the [implementation plan](implementation-plan.md) and
   format v2: `LedgerContext`, `LedgerFormatV2`, epoch-aware providers,
   checkpoints, signed-checkpoint verify, CLI `--context-*` flags, and an
   independent golden vector).
-- [ ] Design an optional keyed suite such as `hmac-sha256-v1`. Keep the secret
+- [x] Design an optional keyed suite such as `hmac-sha256-v1`. Keep the secret
   external; persist only suite and key ID; define rotation, availability,
-  backup, and recovery behavior. (Suite design recorded in
-  [persistence-contract.md](persistence-contract.md).)
-- [ ] Never retrofit or reinterpret v1. Publish independent golden vectors for
-  every context-bound or keyed suite. (v1 and epoch-2 vectors published;
-  keyed-suite vectors pending the suite.)
+  backup, and recovery behavior. (Implemented as epoch 3 / format v3:
+  `LedgerHmacKey`, `LedgerFormatV3`, epoch-aware providers, checkpoints with
+  suite/key binding, CLI `--hmac-key-file`/`--hmac-key-id`, and an independent
+  golden vector.)
+- [x] Never retrofit or reinterpret v1. Publish independent golden vectors for
+  every context-bound or keyed suite. (v1, epoch-2, and epoch-3 vectors
+  published in `vectors/` and verified independently by
+  `tools/verify_golden_vectors.py` in CI.)
 - [x] Document that public context is not secrecy, keyed hashing is not payload
   encryption, and neither replaces independently retained checkpoints
   (`persistence-contract.md` "Cryptographic boundaries").

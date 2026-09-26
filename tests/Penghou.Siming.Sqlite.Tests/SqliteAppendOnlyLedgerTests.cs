@@ -558,6 +558,55 @@ public sealed class SqliteAppendOnlyLedgerTests : IDisposable
         Assert.Contains("context", boundError.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task KeyedSuite_RoundTripsCheckpointsAndVerification()
+    {
+        Directory.CreateDirectory(root);
+        using var key = new LedgerHmacKey(
+            "ops-2026",
+            Enumerable.Range(1, 32).Select(index => (byte)index).ToArray());
+        var context = new LedgerContext { Application = "marang", Environment = "test" };
+        await using (var writer = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("keyed.db") with { LedgerContext = context }, new(), hmacKey: key))
+        {
+            await writer.AppendAsync(new LedgerAppendRequest("s", "one", new byte[] { 1 }));
+            var checkpoint = (await LedgerCheckpoints.CaptureAsync(writer)) with
+            {
+                Suite = LedgerFormatV3.Suite,
+                KeyId = key.KeyId
+            };
+            Assert.Equal(LedgerFormatV3.Version, checkpoint.FormatVersion);
+            Assert.True((await writer.VerifyAsync(checkpoint)).IsValid);
+        }
+
+        await using var reopened = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("keyed.db") with { LedgerContext = context }, new(), hmacKey: key);
+        var head = await reopened.GetHeadAsync();
+        Assert.Equal(LedgerFormatV3.Version, head.FormatVersion);
+        Assert.True((await reopened.VerifyAsync()).IsValid);
+    }
+
+    [Fact]
+    public async Task KeyedSuite_WrongSecret_FailsVerification()
+    {
+        Directory.CreateDirectory(root);
+        var context = new LedgerContext { Application = "marang" };
+        using var key = new LedgerHmacKey(
+            "ops-2026",
+            Enumerable.Range(1, 32).Select(index => (byte)index).ToArray());
+        await using (var writer = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("keyed-wrong.db") with { LedgerContext = context }, new(), hmacKey: key))
+            await writer.AppendAsync(new LedgerAppendRequest("s", "one", new byte[] { 1 }));
+
+        using var wrong = new LedgerHmacKey(
+            "ops-2026",
+            Enumerable.Range(101, 132).Take(32).Select(index => (byte)index).ToArray());
+        await using var reopened = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("keyed-wrong.db") with { LedgerContext = context }, new(), hmacKey: wrong);
+
+        Assert.False((await reopened.VerifyAsync()).IsValid);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

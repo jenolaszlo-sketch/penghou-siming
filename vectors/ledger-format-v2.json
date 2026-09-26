@@ -1,0 +1,22 @@
+{
+  "formatVersion": 2,
+  "context": {
+    "application": "marang",
+    "environment": "production",
+    "tenant": "acme",
+    "deployment": "east"
+  },
+  "expectedContextDigestHex": "de3b43308095e25c91f7c579441cf01d26bce4a8edb77be50438b7bb18bdce34",
+  "expectedGenesisHex": "e427d555bcaff8c73b11468073adc036440e918e9603eda3820c6f9fa23b7ccf",
+  "ledgerId": "00112233-4455-6677-8899-aabbccddeeff",
+  "sequence": 1,
+  "committedAtUnixMilliseconds": 1700000000123,
+  "streamId": "session-1",
+  "eventType": "SessionStarted",
+  "contentType": "application/octet-stream",
+  "serializationFormat": "raw",
+  "serializationVersion": 1,
+  "payloadBase64": "AQ==",
+  "idempotencyKey": null,
+  "expectedHashHex": "f8c7fc5beac434819cb15a90a19adfb5d622c06d4162fff17841dddc0ddc1257"
+}

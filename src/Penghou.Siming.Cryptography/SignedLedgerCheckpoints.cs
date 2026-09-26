@@ -91,6 +91,19 @@ public static class SignedLedgerCheckpoints
         SignedLedgerCheckpoint signed,
         ILedgerCheckpointVerifier verifier,
         LedgerContext? context,
+        out LedgerCheckpoint? checkpoint) =>
+        Verify(signed, verifier, context, key: null, out checkpoint);
+
+    /// <summary>
+    /// Verifies the signature and imports the authenticated checkpoint. A key
+    /// requires a context and epoch-3 checkpoints bound to that suite, key,
+    /// and context.
+    /// </summary>
+    public static bool Verify(
+        SignedLedgerCheckpoint signed,
+        ILedgerCheckpointVerifier verifier,
+        LedgerContext? context,
+        LedgerHmacKey? key,
         out LedgerCheckpoint? checkpoint)
     {
         ArgumentNullException.ThrowIfNull(signed);
@@ -104,7 +117,7 @@ public static class SignedLedgerCheckpoints
             return false;
         try
         {
-            checkpoint = LedgerCheckpoints.Import(signed.CheckpointDocument.Span, context);
+            checkpoint = LedgerCheckpoints.Import(signed.CheckpointDocument.Span, context, key);
             return true;
         }
         catch (FormatException)

@@ -30,6 +30,8 @@
   <ItemGroup>
     <None Include="..\..\vectors\guyabano-canonical-json-v2.json" Link="vectors\guyabano-canonical-json-v2.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\vectors\penghou-canonical-json-v2.json" Link="vectors\penghou-canonical-json-v2.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\vectors\ledger-format-v2.json" Link="vectors\ledger-format-v2.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\vectors\ledger-format-v3.json" Link="vectors\ledger-format-v3.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

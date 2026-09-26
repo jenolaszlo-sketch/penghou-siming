@@ -30,9 +30,27 @@ public static class LedgerCheckpoints
     {
         ValidateShape(checkpoint);
         if (checkpoint.FormatVersion != LedgerFormatV1.Version &&
-            checkpoint.FormatVersion != LedgerFormatV2.Version)
+            checkpoint.FormatVersion != LedgerFormatV2.Version &&
+            checkpoint.FormatVersion != LedgerFormatV3.Version)
             throw new NotSupportedException(
                 $"Ledger format version {checkpoint.FormatVersion} is unsupported.");
+        if (checkpoint.FormatVersion == LedgerFormatV3.Version)
+        {
+            if (checkpoint.Suite != LedgerFormatV3.Suite)
+                throw new ArgumentException(
+                    $"A keyed-suite checkpoint must carry suite '{LedgerFormatV3.Suite}'.",
+                    nameof(checkpoint));
+            if (string.IsNullOrWhiteSpace(checkpoint.KeyId))
+                throw new ArgumentException(
+                    "A keyed-suite checkpoint must carry a key identifier.",
+                    nameof(checkpoint));
+        }
+        else if (checkpoint.Suite is not null || checkpoint.KeyId is not null)
+        {
+            throw new ArgumentException(
+                "Only keyed-suite checkpoints carry a suite binding.",
+                nameof(checkpoint));
+        }
         using var buffer = new MemoryStream();
         using (var writer = new Utf8JsonWriter(buffer))
         {
@@ -44,6 +62,10 @@ public static class LedgerCheckpoints
             writer.WriteString("headHash", checkpoint.HeadHash.ToString());
             writer.WriteNumber("createdAtUnixMilliseconds", checkpoint.CreatedAt.ToUnixTimeMilliseconds());
             writer.WriteNumber("ledgerFormatVersion", checkpoint.FormatVersion);
+            if (checkpoint.Suite is not null)
+                writer.WriteString("suite", checkpoint.Suite);
+            if (checkpoint.KeyId is not null)
+                writer.WriteString("keyId", checkpoint.KeyId);
             writer.WriteEndObject();
         }
         return buffer.ToArray();
@@ -51,14 +73,22 @@ public static class LedgerCheckpoints
 
     /// <summary>Imports and validates a portable epoch-1 checkpoint document.</summary>
     public static LedgerCheckpoint Import(ReadOnlySpan<byte> utf8Json) =>
-        Import(utf8Json, context: null);
+        Import(utf8Json, context: null, key: null);
 
     /// <summary>
     /// Imports and validates a portable checkpoint document. A null context
     /// accepts only epoch-1 checkpoints; a context requires epoch-2
     /// checkpoints bound to that context.
     /// </summary>
-    public static LedgerCheckpoint Import(ReadOnlySpan<byte> utf8Json, LedgerContext? context)
+    public static LedgerCheckpoint Import(ReadOnlySpan<byte> utf8Json, LedgerContext? context) =>
+        Import(utf8Json, context, key: null);
+
+    /// <summary>
+    /// Imports and validates a portable checkpoint document. A key requires a
+    /// context and epoch-3 checkpoints bound to that suite, key, and context.
+    /// </summary>
+    public static LedgerCheckpoint Import(
+        ReadOnlySpan<byte> utf8Json, LedgerContext? context, LedgerHmacKey? key)
     {
         if (utf8Json.Length > MaximumDocumentBytes)
             throw new FormatException(
@@ -74,14 +104,22 @@ public static class LedgerCheckpoints
                 throw new FormatException("The checkpoint document type or version is unsupported.");
             var ledgerId = new LedgerId(Guid.ParseExact(root.GetProperty("ledgerId").GetString()!, "D"));
             var hashText = root.GetProperty("headHash").GetString()!;
+            var suite = root.TryGetProperty("suite", out var suiteElement)
+                ? suiteElement.GetString()
+                : null;
+            var keyId = root.TryGetProperty("keyId", out var keyIdElement)
+                ? keyIdElement.GetString()
+                : null;
             var checkpoint = new LedgerCheckpoint(
                 ledgerId,
                 root.GetProperty("sequence").GetInt64(),
                 new LedgerHash(Convert.FromHexString(hashText)),
                 DateTimeOffset.FromUnixTimeMilliseconds(
                     root.GetProperty("createdAtUnixMilliseconds").GetInt64()),
-                root.GetProperty("ledgerFormatVersion").GetInt32());
-            Validate(checkpoint, context);
+                root.GetProperty("ledgerFormatVersion").GetInt32(),
+                suite,
+                keyId);
+            Validate(checkpoint, context, key);
             return checkpoint;
         }
         catch (FormatException)
@@ -104,10 +142,34 @@ public static class LedgerCheckpoints
             throw new ArgumentOutOfRangeException(nameof(checkpoint), "Checkpoint sequence cannot be negative.");
     }
 
-    private static void Validate(LedgerCheckpoint checkpoint, LedgerContext? context)
+    private static void Validate(
+        LedgerCheckpoint checkpoint, LedgerContext? context, LedgerHmacKey? key)
     {
         ValidateShape(checkpoint);
-        ValidateShape(checkpoint);
+        if (key is not null)
+        {
+            if (context is null)
+                throw new ArgumentException(
+                    "A keyed suite requires a ledger context.", nameof(key));
+            if (checkpoint.FormatVersion != LedgerFormatV3.Version)
+                throw new NotSupportedException(
+                    $"Ledger format version {checkpoint.FormatVersion} is not a keyed suite epoch.");
+            if (checkpoint.Suite != LedgerFormatV3.Suite)
+                throw new FormatException(
+                    $"The checkpoint suite '{checkpoint.Suite}' is not '{LedgerFormatV3.Suite}'.");
+            if (checkpoint.KeyId != key.KeyId)
+                throw new FormatException(
+                    "The checkpoint key identifier does not match the verification key.");
+            if (checkpoint.Sequence == 0 &&
+                checkpoint.HeadHash != LedgerFormatV3.GenesisHash(context, key))
+                throw new ArgumentException(
+                    "An empty keyed checkpoint must contain the epoch genesis for its context and key.",
+                    nameof(checkpoint));
+            return;
+        }
+        if (checkpoint.Suite is not null || checkpoint.KeyId is not null)
+            throw new FormatException(
+                "Only keyed-suite checkpoints carry a suite binding.");
         if (context is null)
         {
             if (checkpoint.FormatVersion != LedgerFormatV1.Version)
