@@ -14,4 +14,7 @@
   <Folder Name="/samples/">
     <Project Path="samples/Penghou.Siming.Samples/Penghou.Siming.Samples.csproj" />
   </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Penghou.Siming.Benchmarks/Penghou.Siming.Benchmarks.csproj" />
+  </Folder>
 </Solution>

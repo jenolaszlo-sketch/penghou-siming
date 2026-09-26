@@ -71,7 +71,9 @@ decisions live in the [implementation plan](implementation-plan.md) and
   (`docs/trimming-and-aot.md`: net8.0-only decision, zero-warning trimmed
   publish, `JsonTypeInfo<T>` serializer overloads, source-generated CLI JSON,
   and AOT analysis status).
-- [ ] Benchmark append, pagination, verification, and large payloads.
+- [x] Benchmark append, pagination, verification, and large payloads
+  (`benchmarks/Penghou.Siming.Benchmarks`; baseline recorded in
+  `BENCHMARKS.md`).
 - [ ] Publish threat-model, retention, backup, signing-key, and checkpoint
   operational guidance.
 - [ ] Add a Git trailer/note checkpoint anchoring sample or adapter.
