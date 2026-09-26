@@ -74,9 +74,12 @@ decisions live in the [implementation plan](implementation-plan.md) and
 - [x] Benchmark append, pagination, verification, and large payloads
   (`benchmarks/Penghou.Siming.Benchmarks`; baseline recorded in
   `BENCHMARKS.md`).
-- [ ] Publish threat-model, retention, backup, signing-key, and checkpoint
-  operational guidance.
-- [ ] Add a Git trailer/note checkpoint anchoring sample or adapter.
+- [x] Publish threat-model, retention, backup, signing-key, and checkpoint
+  operational guidance (`docs/operations.md`).
+- [x] Add a Git trailer/note checkpoint anchoring sample or adapter.
+  (`samples/Penghou.Siming.Samples` anchors a checkpoint to a
+  `Siming-Checkpoint` trailer, reads it back from `git log`, and re-verifies;
+  executed in CI.)
 
 ## Priority 4 — Guyabano adoption
 

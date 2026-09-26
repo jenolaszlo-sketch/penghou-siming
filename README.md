@@ -77,7 +77,8 @@ var verification = await ledger.VerifyAsync(checkpoint);
 ```
 
 See `samples/Penghou.Siming.Samples` for a runnable tour covering idempotency,
-pagination, signed checkpoints, context-bound epochs, and the keyed suite.
+pagination, signed checkpoints, context-bound epochs, the keyed suite, and
+anchoring a checkpoint to a Git trailer with re-verification.
 
 Typed payloads can use `CanonicalJsonPayloadSerializer` (the historical v1
 contract) or `CanonicalJsonPayloadSerializerV2`. The v2 contract rejects

@@ -12,10 +12,14 @@ try
     await SignedCheckpointsAsync();
     await Epoch2ContextBoundAsync();
     await Epoch3KeyedAsync();
+    await GitAnchoringAsync(Path.Combine(root, "anchored"));
     Console.WriteLine("samples: all scenarios passed");
 }
 finally
 {
+    // Git marks object files read-only; normalize before cleanup.
+    foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        File.SetAttributes(file, FileAttributes.Normal);
     Directory.Delete(root, recursive: true);
 }
 return 0;
@@ -126,6 +130,79 @@ static async Task Epoch3KeyedAsync()
     Check(
         !LedgerVerifier.Verify(ledger.LedgerId, entries, context, wrong).IsValid,
         "a wrong secret fails keyed verification");
+}
+
+static async Task GitAnchoringAsync(string repo)
+{
+    Directory.CreateDirectory(repo);
+    await GitAsync(repo, "init", "-q");
+    await GitAsync(repo, "config", "user.email", "samples@example.com");
+    await GitAsync(repo, "config", "user.name", "siming-samples");
+    await GitAsync(repo, "commit", "--allow-empty", "-q", "-m", "anchor point");
+
+    await using var ledger = new InMemoryAppendOnlyLedger<CanonicalJsonPayloadSerializerV2>(new());
+    await ledger.AppendAsync(new LedgerAppendRequest<SessionStarted>(
+        "session-7", "SessionStarted", new("marang", 1)));
+    var checkpoint = await LedgerCheckpoints.CaptureAsync(ledger);
+    var anchored = Convert.ToBase64String(LedgerCheckpoints.Export(checkpoint));
+    await GitAsync(repo, "commit", "--allow-empty", "-q", "-m", "checkpoint",
+        "--trailer", $"Siming-Checkpoint: {anchored}");
+
+    var body = await GitOutputAsync(repo, "log", "-1", "--format=%B");
+    var trailer = body.Split('\n')
+        .Select(line => line.Trim())
+        .FirstOrDefault(line =>
+            line.StartsWith("Siming-Checkpoint:", StringComparison.Ordinal));
+    if (trailer is null)
+        throw new InvalidOperationException("Checkpoint trailer missing from the commit message.");
+    var restored = LedgerCheckpoints.Import(Convert.FromBase64String(
+        trailer["Siming-Checkpoint:".Length..].Trim()));
+    Check(restored == checkpoint, "anchored checkpoint round-trips through git");
+    Check((await ledger.VerifyAsync(restored)).IsValid,
+        "ledger verifies against the anchored checkpoint");
+    Console.WriteLine("samples: checkpoint anchored to a git trailer and re-verified");
+}
+
+static async Task GitAsync(string repo, params string[] args)
+{
+    using var process = new System.Diagnostics.Process
+    {
+        StartInfo = StartGit(repo, args)
+    };
+    process.Start();
+    await process.WaitForExitAsync();
+    if (process.ExitCode != 0)
+        throw new InvalidOperationException(
+            $"git {string.Join(" ", args)} failed: {await process.StandardError.ReadToEndAsync()}");
+}
+
+static async Task<string> GitOutputAsync(string repo, params string[] args)
+{
+    using var process = new System.Diagnostics.Process
+    {
+        StartInfo = StartGit(repo, args)
+    };
+    process.Start();
+    var output = await process.StandardOutput.ReadToEndAsync();
+    await process.WaitForExitAsync();
+    if (process.ExitCode != 0)
+        throw new InvalidOperationException(
+            $"git {string.Join(" ", args)} failed: {await process.StandardError.ReadToEndAsync()}");
+    return output;
+}
+
+static System.Diagnostics.ProcessStartInfo StartGit(string repo, string[] args)
+{
+    var startInfo = new System.Diagnostics.ProcessStartInfo("git")
+    {
+        WorkingDirectory = repo,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false
+    };
+    foreach (var arg in args)
+        startInfo.ArgumentList.Add(arg);
+    return startInfo;
 }
 
 sealed record SessionStarted(string Supervisor, int Attempt);
