@@ -59,27 +59,25 @@ be finalized before the first preview release.
   bounded provenance and content identities over raw secrets or model payloads.
 - Append inputs are bounded before persistence. Defaults are conservative and
   each provider accepts the same provider-neutral `LedgerInputLimits` policy.
-- The v1 suite uses unkeyed SHA-256. Planned evolution distinguishes public
-  ledger-context binding from optional externally keyed hashing; neither will
-  reinterpret v1 history or replace trusted checkpoints.
+- The v1 suite uses unkeyed SHA-256. Epoch 2 binds a public ledger context and
+  epoch 3 adds the optional externally keyed `hmac-sha256-v1` suite; neither
+  reinterprets earlier history nor replaces trusted checkpoints.
 
 ## Quick start
 
 ```csharp
-IAppendOnlyLedger ledger = /* Penghou.Siming.Sqlite */;
+await using var ledger = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializerV2>(
+    new SimingSqliteOptions { DatabasePath = "session-ledger.db" }, new());
 
-var entry = await ledger.AppendAsync(
-    streamId: sessionId,
-    eventType: "WorkspacePromoted",
-    canonicalPayload: payloadBytes);
+var entry = await ledger.AppendAsync(new LedgerAppendRequest<WorkspacePromoted>(
+    sessionId, "WorkspacePromoted", new WorkspacePromoted(/* ... */)));
 
 var checkpoint = await LedgerCheckpoints.CaptureAsync(ledger);
-var verification = await LedgerVerifier.VerifyAsync(
-    ledger,
-    checkpoint,
-    new LedgerVerificationOptions(PageSize: 1000, Progress: progress),
-    cancellationToken);
+var verification = await ledger.VerifyAsync(checkpoint);
 ```
+
+See `samples/Penghou.Siming.Samples` for a runnable tour covering idempotency,
+pagination, signed checkpoints, context-bound epochs, and the keyed suite.
 
 Typed payloads can use `CanonicalJsonPayloadSerializer` (the historical v1
 contract) or `CanonicalJsonPayloadSerializerV2`. The v2 contract rejects
@@ -158,12 +156,25 @@ The API remains pre-release and may change before the first package release.
 
 ## Current status
 
-The current package line is `0.1.0-preview.4` on .NET 8. The in-memory and
+The current package line is `0.1.0-preview.6` on .NET 8. The in-memory and
 SQLite ledgers, provider conformance suite, canonical JSON v1 and v2 identities,
-expected-head appends, bounded verification, detached Ed25519 checkpoints, and
-verification CLI are implemented. Public API baselines, expanded platform CI,
-Native AOT review, operational guidance, and Guyabano adoption remain roadmap
-work.
+expected-head appends, bounded verification, detached Ed25519 checkpoints,
+context-bound (epoch 2) and keyed `hmac-sha256-v1` (epoch 3) ledger epochs, and
+the verification CLI (checkpoint, signed-checkpoint, context, and HMAC key
+flags) are implemented. Runnable API examples live in `samples/` and run in CI.
+Remaining roadmap work includes expanded platform CI, Native AOT review,
+benchmarks, operational guidance, and Guyabano adoption.
+
+## Samples
+
+`samples/Penghou.Siming.Samples` is a runnable end-to-end tour: SQLite appends
+with idempotency and pagination, checkpoint export/import/verification, signed
+checkpoints, context-bound epoch-2 ledgers, and keyed epoch-3 ledgers with a
+wrong-secret failure. Every scenario asserts its outcome:
+
+```powershell
+dotnet run --project samples/Penghou.Siming.Samples -c Release
+```
 
 ## Repository layout
 
@@ -173,9 +184,12 @@ src/Penghou.Siming.Sqlite
 src/Penghou.Siming.Cryptography
 src/Penghou.Siming.Testing
 src/Penghou.Siming.Verify
+samples/Penghou.Siming.Samples
 tests/Penghou.Siming.Tests
 tests/Penghou.Siming.Sqlite.Tests
 docs
+tools
+vectors
 ```
 
 Start with the [implementation plan](docs/implementation-plan.md), then see the

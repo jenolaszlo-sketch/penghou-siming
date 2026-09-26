@@ -60,7 +60,9 @@ decisions live in the [implementation plan](implementation-plan.md) and
 - [x] Establish public API baselines and compatibility policy (PublicApiAnalyzers
   5.6.0 baselines for every packable project; RS0016/RS0017 enforced as build
   errors).
-- [ ] Complete API usage examples beyond the package README.
+- [x] Complete API usage examples beyond the package README
+  (`samples/Penghou.Siming.Samples` runs end-to-end in CI; README quick start
+  uses the real API).
 - [ ] Expand CI beyond Linux and establish package/public-API compatibility
   baselines.
 - [ ] Review trimming, Native AOT, and supported target frameworks.

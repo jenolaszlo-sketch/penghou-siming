@@ -34,6 +34,9 @@ jobs:
       - name: Test
         run: dotnet test Penghou.Siming.slnx --configuration Release --no-build
 
+      - name: Run samples
+        run: dotnet run --project samples/Penghou.Siming.Samples --configuration Release --no-build
+
       - name: Verify independent golden vector
         run: python tools/verify_golden_vectors.py
 

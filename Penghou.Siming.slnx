@@ -11,4 +11,7 @@
     <Project Path="tests/Penghou.Siming.Sqlite.Tests/Penghou.Siming.Sqlite.Tests.csproj" />
     <Project Path="tests/Penghou.Siming.Tests/Penghou.Siming.Tests.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Penghou.Siming.Samples/Penghou.Siming.Samples.csproj" />
+  </Folder>
 </Solution>
