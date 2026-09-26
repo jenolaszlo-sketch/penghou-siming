@@ -63,8 +63,10 @@ decisions live in the [implementation plan](implementation-plan.md) and
 - [x] Complete API usage examples beyond the package README
   (`samples/Penghou.Siming.Samples` runs end-to-end in CI; README quick start
   uses the real API).
-- [ ] Expand CI beyond Linux and establish package/public-API compatibility
-  baselines.
+- [x] Expand CI beyond Linux and establish package/public-API compatibility
+  baselines. (CI matrix: Ubuntu, Windows, macOS; package validation,
+  packed-consumer restore audit, and PublicApiAnalyzers baselines enforced
+  everywhere.)
 - [ ] Review trimming, Native AOT, and supported target frameworks.
 - [ ] Benchmark append, pagination, verification, and large payloads.
 - [ ] Publish threat-model, retention, backup, signing-key, and checkpoint

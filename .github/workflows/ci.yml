@@ -10,7 +10,11 @@ permissions:
 
 jobs:
   build-test-pack:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -50,7 +54,7 @@ jobs:
       - name: Upload packages
         uses: actions/upload-artifact@v6
         with:
-          name: nuget-packages
+          name: nuget-packages-${{ matrix.os }}
           path: |
             artifacts/*.nupkg
             artifacts/*.snupkg
