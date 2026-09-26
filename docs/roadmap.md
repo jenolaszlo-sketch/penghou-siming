@@ -12,7 +12,7 @@ decisions live in the [implementation plan](implementation-plan.md) and
   incrementally rather than copying the entire payload.
 - [ ] Make generated signing keys non-exportable by default and define extension
   points for OS, HSM, and remote signers.
-- [ ] Return machine-readable CLI input errors and the verified key fingerprint.
+- [x] Return machine-readable CLI input errors and the verified key fingerprint.
 
 ## Priority 2 — Complete and evolve the cryptographic contract
 

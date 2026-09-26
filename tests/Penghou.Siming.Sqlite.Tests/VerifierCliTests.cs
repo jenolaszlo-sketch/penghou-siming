@@ -82,6 +82,52 @@ public sealed class VerifierCliTests : IDisposable
 
         Assert.Equal(0, exitCode);
         Assert.Contains("\"valid\":true", output.ToString());
+        var verifier = new Ed25519CheckpointVerifier(
+            signer.ExportPublicKey(), "release-key");
+        using var result = JsonDocument.Parse(output.ToString());
+        Assert.Equal(verifier.Fingerprint,
+            result.RootElement.GetProperty("keyFingerprint").GetString());
+    }
+
+    [Theory]
+    [InlineData("--unknown", "value")]
+    [InlineData("--page-size", null)]
+    public async Task VerifyDatabase_ReturnsMachineReadableInputErrors(string option, string? value)
+    {
+        Directory.CreateDirectory(root);
+        var database = Path.Combine(root, "input.db");
+        await using (var ledger = Create(database))
+            await ledger.GetHeadAsync();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        string[] args = value is null ? [database, option] : [database, option, value];
+
+        var exitCode = await Program.RunAsync(args, output, error, CancellationToken.None);
+
+        Assert.Equal(2, exitCode);
+        Assert.Empty(output.ToString());
+        using var result = JsonDocument.Parse(error.ToString());
+        Assert.False(result.RootElement.GetProperty("valid").GetBoolean());
+        Assert.Equal("InvalidInput", result.RootElement.GetProperty("failure").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(
+            result.RootElement.GetProperty("detail").GetString()));
+    }
+
+    [Fact]
+    public async Task VerifyDatabase_RejectsNonNumericPageSize()
+    {
+        Directory.CreateDirectory(root);
+        var database = Path.Combine(root, "page.db");
+        await using (var ledger = Create(database))
+            await ledger.GetHeadAsync();
+        using var error = new StringWriter();
+
+        var exitCode = await Program.RunAsync(
+            [database, "--page-size", "many"], TextWriter.Null, error, CancellationToken.None);
+
+        Assert.Equal(2, exitCode);
+        using var result = JsonDocument.Parse(error.ToString());
+        Assert.Equal("InvalidInput", result.RootElement.GetProperty("failure").GetString());
     }
 
     private static SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer> Create(

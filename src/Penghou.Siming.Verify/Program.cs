@@ -50,6 +50,7 @@ public static class Program
             string? signedCheckpointPath = null;
             string? publicKeyPath = null;
             string? keyId = null;
+            string? keyFingerprint = null;
             var pageSize = 1_000;
             for (var index = 1; index < args.Count; index += 2)
             {
@@ -86,12 +87,14 @@ public static class Program
                     await File.ReadAllBytesAsync(publicKeyPath, cancellationToken)
                         .ConfigureAwait(false),
                     keyId);
+                keyFingerprint = verifier.Fingerprint;
                 if (!SignedLedgerCheckpoints.Verify(signed, verifier, out checkpoint))
                 {
                     await WriteResultAsync(output, new
                     {
                         valid = false,
-                        failure = "InvalidCheckpointSignature"
+                        failure = "InvalidCheckpointSignature",
+                        keyFingerprint
                     }).ConfigureAwait(false);
                     return 1;
                 }
@@ -117,7 +120,8 @@ public static class Program
                 headHash = result.VerifiedHead.Hash.ToString(),
                 failure = result.Failure?.ToString(),
                 failedSequence = result.FailedSequence,
-                detail = result.Detail
+                detail = result.Detail,
+                keyFingerprint
             }).ConfigureAwait(false);
             return result.IsValid ? 0 : 1;
         }
@@ -130,10 +134,16 @@ public static class Program
             exception is ArgumentException or FormatException or OverflowException or IOException or
                 UnauthorizedAccessException or SimingSchemaCompatibilityException)
         {
-            await error.WriteLineAsync(exception.Message).ConfigureAwait(false);
+            await WriteErrorAsync(error, exception.Message).ConfigureAwait(false);
             return 2;
         }
     }
+
+    private static async Task WriteErrorAsync(TextWriter error, string detail) =>
+        await error.WriteLineAsync(JsonSerializer.Serialize(
+            new { valid = false, failure = "InvalidInput", detail },
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }))
+            .ConfigureAwait(false);
 
     private static async Task WriteResultAsync(TextWriter output, object value) =>
         await output.WriteLineAsync(JsonSerializer.Serialize(value,
@@ -154,6 +164,8 @@ public static class Program
           --public-key <file>          Raw Ed25519 public key for a signed checkpoint.
           --key-id <id>                Expected signed-checkpoint key identifier.
           --page-size <1..10000>       Entries read per verification page (default 1000).
+        Results and input errors are printed as machine-readable JSON.
+        Signed-checkpoint runs report the verified key fingerprint.
         Exit codes: 0 valid, 1 verification failed, 2 usage/input error, 130 cancelled.
         """;
 }

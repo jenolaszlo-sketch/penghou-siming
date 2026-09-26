@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Buffers.Binary;
+using System.Security.Cryptography;
 using NSec.Cryptography;
 
 namespace Penghou.Siming.Cryptography;
@@ -168,6 +169,9 @@ public sealed class Ed25519CheckpointVerifier
     /// <summary>Gets the expected key identifier.</summary>
     public string KeyId { get; }
 
+    /// <summary>Gets the lowercase-hex SHA-256 fingerprint of the imported public key.</summary>
+    public string Fingerprint { get; }
+
     /// <summary>Imports a raw Ed25519 public key and its expected identifier.</summary>
     public Ed25519CheckpointVerifier(ReadOnlySpan<byte> publicKey, string keyId)
     {
@@ -175,6 +179,8 @@ public sealed class Ed25519CheckpointVerifier
         KeyId = string.IsNullOrWhiteSpace(keyId)
             ? throw new ArgumentException("Key ID cannot be empty.", nameof(keyId))
             : keyId;
+        Fingerprint = Convert.ToHexString(
+            SHA256.HashData(key.Export(KeyBlobFormat.RawPublicKey))).ToLowerInvariant();
     }
 
     internal bool Verify(ReadOnlySpan<byte> input, ReadOnlySpan<byte> signature) =>
