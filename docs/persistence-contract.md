@@ -61,6 +61,45 @@ checkpoint detects that replacement or rollback.
 Hash chaining proves historical consistency relative to a trusted head. It does
 not prove actor identity, timestamp accuracy, payload truth, or authorization.
 
+## Cryptographic boundaries
+
+- Public ledger context (application, environment, tenant, deployment, or
+  similar) is correlation data, not secrecy. Committing its digest binds rows to
+  that context; it does not conceal the context and must never be used as a
+  secret.
+- A keyed suite such as `hmac-sha256-v1` authenticates rows with an externally
+  held secret. It proves integrity and authenticity to parties that share the
+  secret; it is not payload encryption and does not hide event contents.
+- Neither context binding nor a keyed suite replaces an independently retained
+  checkpoint. A holder of the secret, or an owner able to recompute an unkeyed
+  chain, can still rewrite or roll back the entire ledger; only a detached
+  checkpoint retained elsewhere detects that replacement or rollback.
+- Key material stays external to the ledger: only the suite identity and key
+  identifier are persisted, so rotation, availability, backup, and recovery are
+  operational responsibilities of the host.
+
+## Planned epoch changes
+
+Context binding and optional keyed suites require a new format/ledger epoch and
+never reinterpret committed v1 rows.
+
+- **Public ledger-context binding.** A future epoch commits a canonical digest
+  of external identity into the genesis hash, every row hash, and portable
+  checkpoints. The digest is taken over a versioned, unambiguous canonical
+  encoding; the same context must be supplied to append and to verify, and
+  changing context begins a new ledger epoch.
+- **Optional keyed suite `hmac-sha256-v1`.** A future suite authenticates rows
+  with an external secret while persisting only the suite identity and key
+  identifier. A lost or rotated key must never silently fall back to unkeyed
+  verification; unavailable key material is reported as a verification failure.
+- Independent golden vectors must be published for every context-bound or keyed
+  suite before it is declared supported.
+- **Envelope schema identity decision.** The ledger envelope does not currently
+  commit an application schema identity; the canonical JSON payload carries its
+  own contract name and version. If an application schema identity is added, it
+  is added only as part of the context-binding epoch above rather than as a
+  separate envelope field.
+
 ## Evolution
 
 The format version is part of every row hash. An incompatible encoding, hash,

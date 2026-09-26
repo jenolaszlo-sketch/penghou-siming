@@ -33,16 +33,21 @@ decisions live in the [implementation plan](implementation-plan.md) and
   cases covered).
 - [ ] Add immutable public ledger-context binding in a future format/ledger
   epoch. Commit a canonical digest of application, environment, tenant,
-  deployment, or similar external identity.
+  deployment, or similar external identity. (Epoch design recorded in
+  [persistence-contract.md](persistence-contract.md).)
 - [ ] Design an optional keyed suite such as `hmac-sha256-v1`. Keep the secret
   external; persist only suite and key ID; define rotation, availability,
-  backup, and recovery behavior.
+  backup, and recovery behavior. (Suite design recorded in
+  [persistence-contract.md](persistence-contract.md).)
 - [ ] Never retrofit or reinterpret v1. Publish independent golden vectors for
   every context-bound or keyed suite.
-- [ ] Document that public context is not secrecy, keyed hashing is not payload
-  encryption, and neither replaces independently retained checkpoints.
-- [ ] Decide whether a future envelope commits application schema identity and
-  version.
+- [x] Document that public context is not secrecy, keyed hashing is not payload
+  encryption, and neither replaces independently retained checkpoints
+  (`persistence-contract.md` "Cryptographic boundaries").
+- [x] Decide whether a future envelope commits application schema identity and
+  version. Decision: no separate envelope field; a payload carries its own
+  contract/version, and an application schema identity would be added only as
+  part of the context-binding epoch if ever needed.
 
 ## Priority 3 — Package readiness
 
