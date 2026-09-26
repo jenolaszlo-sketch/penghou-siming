@@ -31,16 +31,19 @@ decisions live in the [implementation plan](implementation-plan.md) and
   culture, and unsupported versions (v2 now rejects non-UTF-8 persisted JSON
   explicitly with `JsonException`; culture independence and version/insertion
   cases covered).
-- [ ] Add immutable public ledger-context binding in a future format/ledger
+- [x] Add immutable public ledger-context binding in a future format/ledger
   epoch. Commit a canonical digest of application, environment, tenant,
-  deployment, or similar external identity. (Epoch design recorded in
-  [persistence-contract.md](persistence-contract.md).)
+  deployment, or similar external identity (implemented as epoch 2 /
+  format v2: `LedgerContext`, `LedgerFormatV2`, epoch-aware providers,
+  checkpoints, signed-checkpoint verify, CLI `--context-*` flags, and an
+  independent golden vector).
 - [ ] Design an optional keyed suite such as `hmac-sha256-v1`. Keep the secret
   external; persist only suite and key ID; define rotation, availability,
   backup, and recovery behavior. (Suite design recorded in
   [persistence-contract.md](persistence-contract.md).)
 - [ ] Never retrofit or reinterpret v1. Publish independent golden vectors for
-  every context-bound or keyed suite.
+  every context-bound or keyed suite. (v1 and epoch-2 vectors published;
+  keyed-suite vectors pending the suite.)
 - [x] Document that public context is not secrecy, keyed hashing is not payload
   encryption, and neither replaces independently retained checkpoints
   (`persistence-contract.md` "Cryptographic boundaries").

@@ -130,6 +130,52 @@ public sealed class VerifierCliTests : IDisposable
         Assert.Equal("InvalidInput", result.RootElement.GetProperty("failure").GetString());
     }
 
+    [Fact]
+    public async Task VerifyDatabase_AcceptsLedgerContextForEpoch2Ledgers()
+    {
+        Directory.CreateDirectory(root);
+        var database = Path.Combine(root, "epoch2.db");
+        var options = new SimingSqliteOptions
+        {
+            DatabasePath = database,
+            Pooling = false,
+            LedgerContext = new LedgerContext { Application = "marang", Environment = "test" }
+        };
+        await using (var ledger = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(options, new()))
+            await ledger.AppendAsync(new LedgerAppendRequest("s", "one", new byte[] { 1 }));
+        using var output = new StringWriter();
+
+        var exitCode = await Program.RunAsync(
+            [database, "--context-application", "marang", "--context-environment", "test"],
+            output, TextWriter.Null, CancellationToken.None);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"valid\":true", output.ToString());
+    }
+
+    [Fact]
+    public async Task VerifyDatabase_RejectsEpoch2LedgerWithoutItsContext()
+    {
+        Directory.CreateDirectory(root);
+        var database = Path.Combine(root, "epoch2-strict.db");
+        await using (var ledger = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            new SimingSqliteOptions
+            {
+                DatabasePath = database,
+                Pooling = false,
+                LedgerContext = new LedgerContext { Application = "marang" }
+            }, new()))
+            await ledger.AppendAsync(new LedgerAppendRequest("s", "one", new byte[] { 1 }));
+        using var error = new StringWriter();
+
+        var exitCode = await Program.RunAsync(
+            [database], TextWriter.Null, error, CancellationToken.None);
+
+        Assert.Equal(2, exitCode);
+        using var result = JsonDocument.Parse(error.ToString());
+        Assert.Equal("InvalidInput", result.RootElement.GetProperty("failure").GetString());
+    }
+
     private static SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer> Create(
         string database) => new(
             new SimingSqliteOptions { DatabasePath = database, Pooling = false }, new());

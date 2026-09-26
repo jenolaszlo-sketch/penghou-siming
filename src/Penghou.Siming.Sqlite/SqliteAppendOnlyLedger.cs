@@ -18,6 +18,14 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
     private bool initialized;
     private LedgerId ledgerId;
 
+    private int FormatVersion => options.LedgerContext is null
+        ? LedgerFormatV1.Version
+        : LedgerFormatV2.Version;
+
+    private LedgerHash Genesis => options.LedgerContext is null
+        ? LedgerFormatV1.GenesisHash
+        : LedgerFormatV2.GenesisHash(options.LedgerContext);
+
     /// <summary>Creates a SQLite ledger provider with explicit serializer and access options.</summary>
     public SqliteAppendOnlyLedger(
         SimingSqliteOptions options,
@@ -28,6 +36,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         ArgumentException.ThrowIfNullOrWhiteSpace(options.DatabasePath);
         ArgumentNullException.ThrowIfNull(options.InputLimits);
         options.InputLimits.Validate();
+        options.LedgerContext?.Validate();
         this.options = options;
         this.serializer = serializer;
         this.timeProvider = timeProvider ?? TimeProvider.System;
@@ -127,9 +136,10 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         var (sequence, previous) = await ReadHeadAsync(
             connection,
             transaction,
+            Genesis,
             cancellationToken).ConfigureAwait(false);
         var actualHead = new LedgerHead(
-            ledgerId, sequence, previous, LedgerFormatV1.Version);
+            ledgerId, sequence, previous, FormatVersion);
         if (expectedHead is not null && expectedHead != actualHead)
             throw new LedgerHeadConflictException(expectedHead, actualHead);
         await InjectAsync(
@@ -139,15 +149,26 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         var committedAt = DateTimeOffset.FromUnixTimeMilliseconds(
             timeProvider.GetUtcNow().ToUnixTimeMilliseconds());
         var definitivePayload = payload with { Bytes = payload.Bytes.ToArray() };
-        var hash = LedgerFormatV1.ComputeHash(
-            ledgerId,
-            nextSequence,
-            committedAt,
-            streamId,
-            eventType,
-            definitivePayload,
-            idempotencyKey,
-            previous);
+        var hash = options.LedgerContext is null
+            ? LedgerFormatV1.ComputeHash(
+                ledgerId,
+                nextSequence,
+                committedAt,
+                streamId,
+                eventType,
+                definitivePayload,
+                idempotencyKey,
+                previous)
+            : LedgerFormatV2.ComputeHash(
+                ledgerId,
+                nextSequence,
+                committedAt,
+                streamId,
+                eventType,
+                definitivePayload,
+                idempotencyKey,
+                previous,
+                options.LedgerContext);
 
         await InjectAsync(
             SqliteAppendFaultPoint.BeforeInsert,
@@ -183,7 +204,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             (object?)idempotencyKey ?? DBNull.Value);
         command.Parameters.AddWithValue("$previousHash", previous.Bytes.ToArray());
         command.Parameters.AddWithValue("$rowHash", hash.Bytes.ToArray());
-        command.Parameters.AddWithValue("$formatVersion", LedgerFormatV1.Version);
+        command.Parameters.AddWithValue("$formatVersion", FormatVersion);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await InjectAsync(
             SqliteAppendFaultPoint.AfterInsertBeforeCommit,
@@ -203,7 +224,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             idempotencyKey,
             previous,
             hash,
-            LedgerFormatV1.Version);
+            FormatVersion);
     }
 
     /// <inheritdoc />
@@ -280,8 +301,9 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         var (sequence, hash) = await ReadHeadAsync(
             connection,
             null,
+            Genesis,
             cancellationToken).ConfigureAwait(false);
-        return new(ledgerId, sequence, hash, LedgerFormatV1.Version);
+        return new(ledgerId, sequence, hash, FormatVersion);
     }
 
     /// <inheritdoc />
@@ -306,15 +328,16 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         using var transaction = connection.BeginTransaction(deferred: true);
         var (sequence, hash) = await ReadHeadAsync(
-            connection, transaction, cancellationToken).ConfigureAwait(false);
-        var target = new LedgerHead(ledgerId, sequence, hash, LedgerFormatV1.Version);
+            connection, transaction, Genesis, cancellationToken).ConfigureAwait(false);
+        var target = new LedgerHead(ledgerId, sequence, hash, FormatVersion);
         var result = await LedgerVerifier.VerifySnapshotAsync(
             target,
             (request, token) => ReadSnapshotAsync(
                 connection, transaction, request, token),
             checkpoint,
             options,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            this.options.LedgerContext).ConfigureAwait(false);
         transaction.Commit();
         return result;
     }
@@ -369,7 +392,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             catch (SqliteException exception)
             {
                 throw new SimingSchemaCompatibilityException(
-                    "The existing Siming SQLite schema is incompatible with format v1.",
+                    "The existing Siming SQLite schema is incompatible.",
                     exception);
             }
             await ValidateSchemaAsync(
@@ -387,9 +410,8 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             {
                 ledgerId = new LedgerId(Guid.Parse(reader.GetString(0)));
                 var version = reader.GetInt32(1);
-                if (version != LedgerFormatV1.Version)
-                    throw new SimingSchemaCompatibilityException(
-                        $"Ledger format version {version} is unsupported.");
+                if (version != FormatVersion)
+                    throw new SimingSchemaCompatibilityException(EpochMismatchMessage(version));
             }
             else
             {
@@ -400,7 +422,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
                 insert.CommandText =
                     "INSERT INTO ledger_metadata(singleton_id, ledger_id, format_version) VALUES (1, $id, $version);";
                 insert.Parameters.AddWithValue("$id", ledgerId.Value.ToString("D"));
-                insert.Parameters.AddWithValue("$version", LedgerFormatV1.Version);
+                insert.Parameters.AddWithValue("$version", FormatVersion);
                 await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
             transaction.Commit();
@@ -448,9 +470,8 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
                 "The database has no Siming ledger metadata row.");
         ledgerId = new LedgerId(Guid.Parse(reader.GetString(0)));
         var version = reader.GetInt32(1);
-        if (version != LedgerFormatV1.Version)
-            throw new SimingSchemaCompatibilityException(
-                $"Ledger format version {version} is unsupported.");
+        if (version != FormatVersion)
+            throw new SimingSchemaCompatibilityException(EpochMismatchMessage(version));
         await reader.DisposeAsync().ConfigureAwait(false);
         transaction.Commit();
     }
@@ -671,9 +692,15 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         bool NotNull,
         bool PrimaryKey);
 
+    private string EpochMismatchMessage(int version) =>
+        options.LedgerContext is null
+            ? $"The database holds a context-bound (epoch-{version}) ledger; supply its ledger context to open it."
+            : $"The database holds an epoch-{version} ledger; the configured ledger context requires epoch {FormatVersion}. Changing context begins a new ledger in a new database.";
+
     private static async Task<(long Sequence, LedgerHash Hash)> ReadHeadAsync(
         SqliteConnection connection,
         SqliteTransaction? transaction,
+        LedgerHash emptyGenesis,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
@@ -684,7 +711,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             cancellationToken).ConfigureAwait(false);
         return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
             ? (reader.GetInt64(0), new LedgerHash((byte[])reader[1]))
-            : (0, LedgerFormatV1.GenesisHash);
+            : (0, emptyGenesis);
     }
 
     private static async Task<LedgerEntry?> ReadByIdempotencyKeyCoreAsync(

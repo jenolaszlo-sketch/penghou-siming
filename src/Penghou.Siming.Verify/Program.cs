@@ -51,6 +51,10 @@ public static class Program
             string? publicKeyPath = null;
             string? keyId = null;
             string? keyFingerprint = null;
+            string? contextApplication = null;
+            string? contextEnvironment = null;
+            string? contextTenant = null;
+            string? contextDeployment = null;
             var pageSize = 1_000;
             for (var index = 1; index < args.Count; index += 2)
             {
@@ -63,19 +67,36 @@ public static class Program
                     case "--public-key": publicKeyPath = args[index + 1]; break;
                     case "--key-id": keyId = args[index + 1]; break;
                     case "--page-size": pageSize = int.Parse(args[index + 1]); break;
+                    case "--context-application": contextApplication = args[index + 1]; break;
+                    case "--context-environment": contextEnvironment = args[index + 1]; break;
+                    case "--context-tenant": contextTenant = args[index + 1]; break;
+                    case "--context-deployment": contextDeployment = args[index + 1]; break;
                     default: throw new ArgumentException($"Unknown option '{args[index]}'.");
                 }
             }
             if (checkpointPath is not null && signedCheckpointPath is not null)
                 throw new ArgumentException(
                     "Use either --checkpoint or --signed-checkpoint, not both.");
+            LedgerContext? context =
+                contextApplication is null && contextEnvironment is null &&
+                contextTenant is null && contextDeployment is null
+                    ? null
+                    : new LedgerContext
+                    {
+                        Application = contextApplication,
+                        Environment = contextEnvironment,
+                        Tenant = contextTenant,
+                        Deployment = contextDeployment
+                    };
+            context?.Validate();
 
             LedgerCheckpoint? checkpoint = null;
             if (checkpointPath is not null)
                 checkpoint = LedgerCheckpoints.Import(
                     await ReadBoundedAsync(checkpointPath,
                         LedgerCheckpoints.MaximumDocumentBytes, "checkpoint", cancellationToken)
-                        .ConfigureAwait(false));
+                        .ConfigureAwait(false),
+                    context);
             if (signedCheckpointPath is not null)
             {
                 if (publicKeyPath is null || string.IsNullOrWhiteSpace(keyId))
@@ -90,7 +111,7 @@ public static class Program
                         .ConfigureAwait(false),
                     keyId);
                 keyFingerprint = verifier.Fingerprint;
-                if (!SignedLedgerCheckpoints.Verify(signed, verifier, out checkpoint))
+                if (!SignedLedgerCheckpoints.Verify(signed, verifier, context, out checkpoint))
                 {
                     await WriteResultAsync(output, new
                     {
@@ -107,7 +128,8 @@ public static class Program
                     new SimingSqliteOptions
                     {
                         DatabasePath = database,
-                        OpenMode = SimingSqliteOpenMode.ReadOnly
+                        OpenMode = SimingSqliteOpenMode.ReadOnly,
+                        LedgerContext = context
                     }, new());
             var progress = new TextProgress(error);
             var result = await ledger.VerifyAsync(
@@ -176,6 +198,10 @@ public static class Program
           --public-key <file>          Raw Ed25519 public key for a signed checkpoint.
           --key-id <id>                Expected signed-checkpoint key identifier.
           --page-size <1..10000>       Entries read per verification page (default 1000).
+          --context-application <id>   Ledger-context application identity (epoch-2 ledgers).
+          --context-environment <id>   Ledger-context environment identity.
+          --context-tenant <id>        Ledger-context tenant identity.
+          --context-deployment <id>    Ledger-context deployment identity.
         Results and input errors are printed as machine-readable JSON.
         Signed-checkpoint runs report the verified key fingerprint.
         Exit codes: 0 valid, 1 verification failed, 2 usage/input error, 130 cancelled.

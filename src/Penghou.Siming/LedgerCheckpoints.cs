@@ -5,7 +5,7 @@ namespace Penghou.Siming;
 /// <summary>Captures and serializes portable versioned ledger checkpoints.</summary>
 public static class LedgerCheckpoints
 {
-    /// <summary>Largest portable checkpoint document accepted by <see cref="Import"/>.</summary>
+    /// <summary>Largest portable checkpoint document accepted by <see cref="Import(ReadOnlySpan{byte})"/>.</summary>
     public const int MaximumDocumentBytes = 64 * 1024;
 
     /// <summary>Captures the ledger's current head as a checkpoint.</summary>
@@ -28,7 +28,11 @@ public static class LedgerCheckpoints
     /// <summary>Exports a deterministic portable checkpoint document.</summary>
     public static byte[] Export(LedgerCheckpoint checkpoint)
     {
-        Validate(checkpoint);
+        ValidateShape(checkpoint);
+        if (checkpoint.FormatVersion != LedgerFormatV1.Version &&
+            checkpoint.FormatVersion != LedgerFormatV2.Version)
+            throw new NotSupportedException(
+                $"Ledger format version {checkpoint.FormatVersion} is unsupported.");
         using var buffer = new MemoryStream();
         using (var writer = new Utf8JsonWriter(buffer))
         {
@@ -45,8 +49,16 @@ public static class LedgerCheckpoints
         return buffer.ToArray();
     }
 
-    /// <summary>Imports and validates a portable checkpoint document.</summary>
-    public static LedgerCheckpoint Import(ReadOnlySpan<byte> utf8Json)
+    /// <summary>Imports and validates a portable epoch-1 checkpoint document.</summary>
+    public static LedgerCheckpoint Import(ReadOnlySpan<byte> utf8Json) =>
+        Import(utf8Json, context: null);
+
+    /// <summary>
+    /// Imports and validates a portable checkpoint document. A null context
+    /// accepts only epoch-1 checkpoints; a context requires epoch-2
+    /// checkpoints bound to that context.
+    /// </summary>
+    public static LedgerCheckpoint Import(ReadOnlySpan<byte> utf8Json, LedgerContext? context)
     {
         if (utf8Json.Length > MaximumDocumentBytes)
             throw new FormatException(
@@ -69,7 +81,7 @@ public static class LedgerCheckpoints
                 DateTimeOffset.FromUnixTimeMilliseconds(
                     root.GetProperty("createdAtUnixMilliseconds").GetInt64()),
                 root.GetProperty("ledgerFormatVersion").GetInt32());
-            Validate(checkpoint);
+            Validate(checkpoint, context);
             return checkpoint;
         }
         catch (FormatException)
@@ -83,19 +95,37 @@ public static class LedgerCheckpoints
         }
     }
 
-    private static void Validate(LedgerCheckpoint checkpoint)
+    private static void ValidateShape(LedgerCheckpoint checkpoint)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         if (checkpoint.LedgerId.Value == Guid.Empty)
             throw new ArgumentException("Ledger ID cannot be empty.", nameof(checkpoint));
         if (checkpoint.Sequence < 0)
             throw new ArgumentOutOfRangeException(nameof(checkpoint), "Checkpoint sequence cannot be negative.");
-        if (checkpoint.FormatVersion != LedgerFormatV1.Version)
+    }
+
+    private static void Validate(LedgerCheckpoint checkpoint, LedgerContext? context)
+    {
+        ValidateShape(checkpoint);
+        ValidateShape(checkpoint);
+        if (context is null)
+        {
+            if (checkpoint.FormatVersion != LedgerFormatV1.Version)
+                throw new NotSupportedException(
+                    $"Ledger format version {checkpoint.FormatVersion} is unsupported.");
+            if (checkpoint.Sequence == 0 && checkpoint.HeadHash != LedgerFormatV1.GenesisHash)
+                throw new ArgumentException(
+                    "An empty-ledger checkpoint must contain the v1 genesis hash.",
+                    nameof(checkpoint));
+            return;
+        }
+        if (checkpoint.FormatVersion != LedgerFormatV2.Version)
             throw new NotSupportedException(
-                $"Ledger format version {checkpoint.FormatVersion} is unsupported.");
-        if (checkpoint.Sequence == 0 && checkpoint.HeadHash != LedgerFormatV1.GenesisHash)
+                $"Ledger format version {checkpoint.FormatVersion} is not a context-bound epoch.");
+        if (checkpoint.Sequence == 0 &&
+            checkpoint.HeadHash != LedgerFormatV2.GenesisHash(context))
             throw new ArgumentException(
-                "An empty-ledger checkpoint must contain the v1 genesis hash.",
+                "An empty context-bound checkpoint must contain the epoch genesis for its context.",
                 nameof(checkpoint));
     }
 }

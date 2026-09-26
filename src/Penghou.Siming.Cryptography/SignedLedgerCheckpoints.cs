@@ -75,10 +75,22 @@ public static class SignedLedgerCheckpoints
             signer.Sign(CreateInput(signer.KeyId, document)));
     }
 
-    /// <summary>Verifies the signature and imports the authenticated checkpoint.</summary>
+    /// <summary>Verifies the signature and imports the authenticated epoch-1 checkpoint.</summary>
     public static bool Verify(
         SignedLedgerCheckpoint signed,
         ILedgerCheckpointVerifier verifier,
+        out LedgerCheckpoint? checkpoint) =>
+        Verify(signed, verifier, context: null, out checkpoint);
+
+    /// <summary>
+    /// Verifies the signature and imports the authenticated checkpoint. A null
+    /// context accepts only epoch-1 checkpoints; a context requires epoch-2
+    /// checkpoints bound to that context.
+    /// </summary>
+    public static bool Verify(
+        SignedLedgerCheckpoint signed,
+        ILedgerCheckpointVerifier verifier,
+        LedgerContext? context,
         out LedgerCheckpoint? checkpoint)
     {
         ArgumentNullException.ThrowIfNull(signed);
@@ -92,7 +104,7 @@ public static class SignedLedgerCheckpoints
             return false;
         try
         {
-            checkpoint = LedgerCheckpoints.Import(signed.CheckpointDocument.Span);
+            checkpoint = LedgerCheckpoints.Import(signed.CheckpointDocument.Span, context);
             return true;
         }
         catch (FormatException)

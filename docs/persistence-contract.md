@@ -39,6 +39,43 @@ hash is:
 f31470fc756cc7e09a8f87eeb93643f4586f572487d18524adafe88b6318c9e9
 ```
 
+## Epoch 2: context-bound rows
+
+A ledger context (`LedgerContext`) binds external identity into a new ledger
+epoch (format v2). At least one of application, environment, tenant, or
+deployment must be set; each field is bounded to 256 UTF-8 bytes.
+
+The canonical context digest is `SHA256` over:
+
+1. the domain string `penghou-siming-ledger-context-v1` with a NUL terminator;
+2. for each identity field in fixed order (application, environment, tenant,
+   deployment): a presence byte, then the UTF-8 byte length and exact bytes
+   when present.
+
+The v2 genesis is `SHA256("penghou-siming-ledger-v2" + NUL + context-digest)`.
+Each v2 row hash commits the exact v1 envelope field order with the format
+version `2`, followed by the 32-byte context digest. The committed v2 golden
+vector is encoded by `LedgerContextTests.V2_RowHash_IsStableAndBoundToContext`:
+
+```text
+f8c7fc5beac434819cb15a90a19adfb5d622c06d4162fff17841dddc0ddc1257
+```
+
+Epoch rules:
+
+- v1 rows are never reinterpreted; a v1 ledger verifies only with a null
+  context, and a context-bound ledger verifies only with its exact context.
+- A checkpoint records its epoch in `FormatVersion`; mismatched epochs report
+  `UnsupportedVersion` rather than a hash failure.
+- Portable checkpoints for epoch 2 require the context at import; a context
+  presented for an epoch-1 checkpoint, or no context for an epoch-2
+  checkpoint, is rejected.
+- SQLite databases record their epoch in `ledger_metadata.format_version`.
+  Opening with a mismatched context fails closed; changing context begins a
+  new ledger in a new database. The table schema is unchanged.
+- Signed checkpoints authenticate the document bytes; the ledger context binds
+  when the checkpoint anchors verification, not at signature time.
+
 ## SQLite responsibilities
 
 The SQLite backend atomically reads the head, allocates the next sequence,
@@ -80,20 +117,18 @@ not prove actor identity, timestamp accuracy, payload truth, or authorization.
 
 ## Planned epoch changes
 
-Context binding and optional keyed suites require a new format/ledger epoch and
-never reinterpret committed v1 rows.
+Optional keyed suites require a new format/ledger epoch and
+never reinterpret committed rows.
 
-- **Public ledger-context binding.** A future epoch commits a canonical digest
-  of external identity into the genesis hash, every row hash, and portable
-  checkpoints. The digest is taken over a versioned, unambiguous canonical
-  encoding; the same context must be supplied to append and to verify, and
-  changing context begins a new ledger epoch.
+- **Public ledger-context binding (implemented as epoch 2).** See
+  "Epoch 2: context-bound rows" above.
 - **Optional keyed suite `hmac-sha256-v1`.** A future suite authenticates rows
   with an external secret while persisting only the suite identity and key
   identifier. A lost or rotated key must never silently fall back to unkeyed
   verification; unavailable key material is reported as a verification failure.
-- Independent golden vectors must be published for every context-bound or keyed
-  suite before it is declared supported.
+- Independent golden vectors must be published for every keyed
+  suite before it is declared supported. The epoch-2 vector above is the
+  first context-bound vector.
 - **Envelope schema identity decision.** The ledger envelope does not currently
   commit an application schema identity; the canonical JSON payload carries its
   own contract name and version. If an application schema identity is added, it

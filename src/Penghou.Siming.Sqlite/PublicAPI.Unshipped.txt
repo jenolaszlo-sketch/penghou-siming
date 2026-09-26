@@ -17,6 +17,8 @@ Penghou.Siming.Sqlite.SimingSqliteOptions.DatabasePath.init -> void
 Penghou.Siming.Sqlite.SimingSqliteOptions.Equals(Penghou.Siming.Sqlite.SimingSqliteOptions? other) -> bool
 Penghou.Siming.Sqlite.SimingSqliteOptions.InputLimits.get -> Penghou.Siming.LedgerInputLimits!
 Penghou.Siming.Sqlite.SimingSqliteOptions.InputLimits.init -> void
+Penghou.Siming.Sqlite.SimingSqliteOptions.LedgerContext.get -> Penghou.Siming.LedgerContext?
+Penghou.Siming.Sqlite.SimingSqliteOptions.LedgerContext.init -> void
 Penghou.Siming.Sqlite.SimingSqliteOptions.OpenMode.get -> Penghou.Siming.Sqlite.SimingSqliteOpenMode
 Penghou.Siming.Sqlite.SimingSqliteOptions.OpenMode.init -> void
 Penghou.Siming.Sqlite.SimingSqliteOptions.Pooling.get -> bool

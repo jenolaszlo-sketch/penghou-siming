@@ -513,6 +513,51 @@ public sealed class SqliteAppendOnlyLedgerTests : IDisposable
         public void Report(LedgerVerificationProgress value) => callback(value);
     }
 
+    [Fact]
+    public async Task ContextBoundLedger_RoundTripsCheckpointsAndVerification()
+    {
+        Directory.CreateDirectory(root);
+        var context = new LedgerContext { Application = "marang", Environment = "test" };
+        await using (var writer = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("epoch.db") with { LedgerContext = context }, new()))
+        {
+            await writer.AppendAsync(new LedgerAppendRequest("s", "one", new byte[] { 1 }));
+            var checkpoint = await LedgerCheckpoints.CaptureAsync(writer);
+            Assert.Equal(LedgerFormatV2.Version, checkpoint.FormatVersion);
+            Assert.True((await writer.VerifyAsync(checkpoint)).IsValid);
+        }
+
+        await using var reopened = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("epoch.db") with { LedgerContext = context }, new());
+        var head = await reopened.GetHeadAsync();
+        Assert.Equal(1, head.Sequence);
+        Assert.Equal(LedgerFormatV2.Version, head.FormatVersion);
+        Assert.True((await reopened.VerifyAsync()).IsValid);
+    }
+
+    [Fact]
+    public async Task EpochMismatch_OnOpen_FailsClosed()
+    {
+        Directory.CreateDirectory(root);
+        var context = new LedgerContext { Application = "marang" };
+        await using (var plain = Create("epoch-plain.db"))
+            await plain.AppendAsync(new LedgerAppendRequest("s", "one", new byte[] { 1 }));
+        await using (var bound = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("epoch-bound.db") with { LedgerContext = context }, new()))
+            await bound.AppendAsync(new LedgerAppendRequest("s", "one", new byte[] { 1 }));
+
+        await using var wrongContext = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("epoch-plain.db") with { LedgerContext = context }, new());
+        var plainError = await Assert.ThrowsAsync<SimingSchemaCompatibilityException>(() =>
+            wrongContext.GetHeadAsync().AsTask());
+        Assert.Contains("epoch", plainError.Message, StringComparison.OrdinalIgnoreCase);
+
+        await using var missingContext = Create("epoch-bound.db");
+        var boundError = await Assert.ThrowsAsync<SimingSchemaCompatibilityException>(() =>
+            missingContext.GetHeadAsync().AsTask());
+        Assert.Contains("context", boundError.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

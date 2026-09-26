@@ -18,6 +18,13 @@ public sealed record SimingSqliteOptions
 
     /// <summary>Gets append-input limits enforced before opening a write transaction.</summary>
     public LedgerInputLimits InputLimits { get; init; } = LedgerInputLimits.Default;
+
+    /// <summary>
+    /// Gets the ledger context for a context-bound (epoch-2) ledger, or null
+    /// for an epoch-1 ledger. The context must match on every open; changing
+    /// it begins a new ledger in a new database.
+    /// </summary>
+    public LedgerContext? LedgerContext { get; init; }
 }
 
 /// <summary>SQLite provider access intent.</summary>

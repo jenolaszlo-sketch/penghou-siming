@@ -11,19 +11,31 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
     private readonly TSerializer serializer;
     private readonly TimeProvider timeProvider;
     private readonly LedgerInputLimits inputLimits;
+    private readonly LedgerContext? ledgerContext;
+    private readonly int formatVersion;
+    private readonly LedgerHash genesis;
 
     /// <summary>Creates an in-memory ledger.</summary>
-    public InMemoryAppendOnlyLedger(TSerializer serializer, TimeProvider? timeProvider = null, LedgerId? ledgerId = null, LedgerInputLimits? inputLimits = null)
+    public InMemoryAppendOnlyLedger(TSerializer serializer, TimeProvider? timeProvider = null, LedgerId? ledgerId = null, LedgerInputLimits? inputLimits = null, LedgerContext? ledgerContext = null)
     {
         this.serializer = serializer;
         this.timeProvider = timeProvider ?? TimeProvider.System;
         this.inputLimits = inputLimits ?? LedgerInputLimits.Default;
         this.inputLimits.Validate();
+        this.ledgerContext = ledgerContext;
+        ledgerContext?.Validate();
+        formatVersion = ledgerContext is null ? LedgerFormatV1.Version : LedgerFormatV2.Version;
+        genesis = ledgerContext is null
+            ? LedgerFormatV1.GenesisHash
+            : LedgerFormatV2.GenesisHash(ledgerContext);
         LedgerId = ledgerId ?? Penghou.Siming.LedgerId.New();
     }
 
     /// <summary>Gets this ledger's immutable identity.</summary>
     public LedgerId LedgerId { get; }
+
+    /// <summary>Gets the ledger context, or null for an epoch-1 ledger.</summary>
+    public LedgerContext? Context => ledgerContext;
 
     /// <inheritdoc />
     public ValueTask<LedgerEntry> AppendAsync<T>(LedgerAppendRequest<T> request, CancellationToken cancellationToken = default)
@@ -64,17 +76,19 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
                 return existing;
             }
             var actualHead = entries.Count == 0
-                ? new LedgerHead(LedgerId, 0, LedgerFormatV1.GenesisHash, LedgerFormatV1.Version)
-                : new LedgerHead(LedgerId, entries[^1].Sequence, entries[^1].Hash, LedgerFormatV1.Version);
+                ? new LedgerHead(LedgerId, 0, genesis, formatVersion)
+                : new LedgerHead(LedgerId, entries[^1].Sequence, entries[^1].Hash, formatVersion);
             if (expectedHead is not null && expectedHead != actualHead)
                 throw new LedgerHeadConflictException(expectedHead, actualHead);
             var sequence = entries.Count + 1L;
-            var previous = entries.Count == 0 ? LedgerFormatV1.GenesisHash : entries[^1].Hash;
+            var previous = entries.Count == 0 ? genesis : entries[^1].Hash;
             var committedAt = DateTimeOffset.FromUnixTimeMilliseconds(
                 timeProvider.GetUtcNow().ToUnixTimeMilliseconds());
             var definitivePayload = payload with { Bytes = payload.Bytes.ToArray() };
-            var hash = LedgerFormatV1.ComputeHash(LedgerId, sequence, committedAt, streamId, eventType, definitivePayload, idempotencyKey, previous);
-            var entry = new LedgerEntry(sequence, streamId, committedAt, eventType, definitivePayload.ContentType, definitivePayload.SerializationFormat, definitivePayload.SerializationVersion, definitivePayload.Bytes, idempotencyKey, previous, hash, LedgerFormatV1.Version);
+            var hash = ledgerContext is null
+                ? LedgerFormatV1.ComputeHash(LedgerId, sequence, committedAt, streamId, eventType, definitivePayload, idempotencyKey, previous)
+                : LedgerFormatV2.ComputeHash(LedgerId, sequence, committedAt, streamId, eventType, definitivePayload, idempotencyKey, previous, ledgerContext);
+            var entry = new LedgerEntry(sequence, streamId, committedAt, eventType, definitivePayload.ContentType, definitivePayload.SerializationFormat, definitivePayload.SerializationVersion, definitivePayload.Bytes, idempotencyKey, previous, hash, formatVersion);
             entries.Add(entry);
             if (idempotencyKey is not null) idempotentEntries.Add(idempotencyKey, entry);
             return entry;
@@ -115,7 +129,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
     public async ValueTask<LedgerHead> GetHeadAsync(CancellationToken cancellationToken = default)
     {
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try { return entries.Count == 0 ? new(LedgerId, 0, LedgerFormatV1.GenesisHash, LedgerFormatV1.Version) : new(LedgerId, entries[^1].Sequence, entries[^1].Hash, LedgerFormatV1.Version); }
+        try { return entries.Count == 0 ? new(LedgerId, 0, genesis, formatVersion) : new(LedgerId, entries[^1].Sequence, entries[^1].Hash, formatVersion); }
         finally { gate.Release(); }
     }
 
@@ -123,7 +137,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
     public async ValueTask<LedgerVerificationResult> VerifyAsync(LedgerCheckpoint? checkpoint = null, CancellationToken cancellationToken = default)
     {
         return await LedgerVerifier.VerifyAsync(
-            this, checkpoint, cancellationToken: cancellationToken).ConfigureAwait(false);
+            this, checkpoint, cancellationToken: cancellationToken, context: ledgerContext).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
