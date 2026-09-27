@@ -405,24 +405,52 @@ measurements demonstrate a real need.
 
 ## Open decisions
 
-1. Application schema identity/version in a future envelope.
-2. Exact public ledger-context schema and lifecycle.
-3. Whether keyed hashing belongs in core or the cryptography package.
-4. Key rotation semantics: new ledger epoch, suite transition event, or both.
-5. Supported target frameworks for the first preview.
-6. First independent Guyabano checkpoint location: Git trailer, Git note,
-   separate file, or multiple anchors.
+1. ~~Application schema identity/version in a future envelope.~~ Decided: no
+   separate envelope field; payloads carry their own contract/version.
+2. ~~Exact public ledger-context schema and lifecycle.~~ Decided and shipped
+   as epoch 2: `LedgerContext` (application/environment/tenant/deployment),
+   canonical digest, same context required to append and verify, change means
+   a new ledger epoch.
+3. ~~Whether keyed hashing belongs in core or the cryptography package.~~
+   Decided: core (`LedgerFormatV3`, `LedgerHmacKey`); the cryptography
+   package stays signature-verification only.
+4. ~~Key rotation semantics: new ledger epoch, suite transition event, or
+   both.~~ Decided: rotation assigns a new key identifier and begins a new
+   ledger epoch; retired keys are retained for old history.
+5. ~~Supported target frameworks for the first preview.~~ Decided: net8.0
+   only; see `docs/trimming-and-aot.md`.
+6. ~~First independent Guyabano checkpoint location: Git trailer, Git note,
+   separate file, or multiple anchors.~~ Decided: Git trailer
+   (`Siming-Checkpoint`), proven by the runnable sample.
 7. Guyabano payload classification and retention policy for prompts, model
    responses, tool output, and generated content.
 
+### Preview compatibility policy
+
+Source compatibility is preserved within the preview line, but optional
+parameters and record-shape changes are binary-breaking for already-compiled
+consumers (observed 2026-09-27: packed Hongxian against a new Siming).
+Downstream packagers must rebuild on every Siming preview bump; toward 1.0,
+prefer overloads over optional-parameter and record-shape changes on public
+members.
+
 ## Current repository state
 
-- The repository contains the core, SQLite, cryptography, testing, verifier CLI,
-  and test projects. Public APIs remain pre-release.
+- All roadmap priorities are complete through `0.1.0-preview.7`: verification
+  hardening (P1), the cryptographic contract including context-bound epoch 2
+  and keyed `hmac-sha256-v1` epoch 3 (P2), package readiness (P3), and
+  Guyabano adoption (P4). Only explicitly deferred items remain.
 - The core supports raw definitive bytes and typed append requests through an
-  injected serializer. Canonical JSON, the v1 binary encoder/hasher, an in-memory
-  provider, checkpoint-aware verification, and the first golden vector are
-  implemented.
+  injected serializer, with source-generated `JsonTypeInfo<T>` overloads for
+  trimmed and Native AOT applications. Canonical JSON v1/v2, incremental
+  row hashing, three ledger epochs with independent golden vectors (also
+  verified by the Python checker), an in-memory provider, checkpoint-aware
+  verification behind one state machine, and the verifier CLI (JSON errors,
+  key fingerprint, context and HMAC flags) are implemented.
+- The full suite passes 103 tests (67 core and 36 SQLite) with enforced
+  public-API baselines; CI runs Ubuntu, Windows, and macOS with samples,
+  benchmarks (`BENCHMARKS.md`), and threat-model/operations guidance
+  (`docs/operations.md`, `docs/trimming-and-aot.md`).
 - The SQLite provider has immutable metadata/entry tables, WAL setup,
   immediate transactional appends, ordered and paged reads, stream filtering,
   update/delete rejection triggers, reopen verification, and separate-instance
