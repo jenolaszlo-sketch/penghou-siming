@@ -19,6 +19,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
     /// <summary>Creates an in-memory ledger.</summary>
     public InMemoryAppendOnlyLedger(TSerializer serializer, TimeProvider? timeProvider = null, LedgerId? ledgerId = null, LedgerInputLimits? inputLimits = null, LedgerContext? ledgerContext = null, LedgerHmacKey? hmacKey = null)
     {
+        ArgumentNullException.ThrowIfNull(serializer);
         this.serializer = serializer;
         this.timeProvider = timeProvider ?? TimeProvider.System;
         this.inputLimits = inputLimits ?? LedgerInputLimits.Default;
@@ -71,13 +72,18 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
         ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
         inputLimits.ValidateIdempotencyKey(idempotencyKey);
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try { return idempotentEntries.GetValueOrDefault(idempotencyKey); }
+        try
+        {
+            var entry = idempotentEntries.GetValueOrDefault(idempotencyKey);
+            return entry is null ? null : Detach(entry);
+        }
         finally { gate.Release(); }
     }
 
     private async ValueTask<LedgerEntry> AppendSerializedAsync(string streamId, string eventType, SerializedLedgerPayload payload, string? idempotencyKey, LedgerHead? expectedHead, CancellationToken cancellationToken)
     {
         inputLimits.ValidateAppend(streamId, eventType, payload, idempotencyKey);
+        payload = payload with { Bytes = payload.Bytes.ToArray() };
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -85,7 +91,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
             {
                 if (!Matches(existing, streamId, eventType, payload))
                     throw new LedgerIdempotencyConflictException(idempotencyKey);
-                return existing;
+                return Detach(existing);
             }
             var actualHead = entries.Count == 0
                 ? new LedgerHead(LedgerId, 0, genesis, formatVersion)
@@ -105,7 +111,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
             var entry = new LedgerEntry(sequence, streamId, committedAt, eventType, definitivePayload.ContentType, definitivePayload.SerializationFormat, definitivePayload.SerializationVersion, definitivePayload.Bytes, idempotencyKey, previous, hash, formatVersion);
             entries.Add(entry);
             if (idempotencyKey is not null) idempotentEntries.Add(idempotencyKey, entry);
-            return entry;
+            return Detach(entry);
         }
         finally { gate.Release(); }
     }
@@ -117,7 +123,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try { snapshot = entries.Where(item => streamId is null || item.StreamId.Equals(streamId, StringComparison.Ordinal)).ToArray(); }
         finally { gate.Release(); }
-        foreach (var entry in snapshot) { cancellationToken.ThrowIfCancellationRequested(); yield return entry; }
+        foreach (var entry in snapshot) { cancellationToken.ThrowIfCancellationRequested(); yield return Detach(entry); }
     }
 
     /// <inheritdoc />
@@ -136,7 +142,7 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
                 .ToArray();
         }
         finally { gate.Release(); }
-        foreach (var entry in snapshot) { cancellationToken.ThrowIfCancellationRequested(); yield return entry; }
+        foreach (var entry in snapshot) { cancellationToken.ThrowIfCancellationRequested(); yield return Detach(entry); }
     }
 
     /// <inheritdoc />
@@ -156,6 +162,9 @@ public sealed class InMemoryAppendOnlyLedger<TSerializer> : IAppendOnlyLedger<TS
 
     /// <inheritdoc />
     public ValueTask DisposeAsync() { gate.Dispose(); return ValueTask.CompletedTask; }
+
+    private static LedgerEntry Detach(LedgerEntry entry) =>
+        entry with { Payload = entry.Payload.ToArray() };
 
     private static bool Matches(LedgerEntry entry, string streamId, string eventType, SerializedLedgerPayload payload) =>
         entry.StreamId.Equals(streamId, StringComparison.Ordinal) &&

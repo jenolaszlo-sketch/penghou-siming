@@ -35,8 +35,12 @@ anchored in Git, signed, or stored elsewhere.
 | `Penghou.Siming.Testing` | Provider-neutral conformance checks reusable by SQLite and future storage providers |
 | `Penghou.Siming.Verify` | Standalone SQLite ledger and checkpoint verification CLI |
 
-The projects currently target .NET 8. Multi-targeting and packaging policy will
-be finalized before the first preview release.
+The five packages target .NET 8. The supported graduation profile covers
+Windows, Linux and macOS; no additional framework is included. The
+[stable contract](docs/stable-contract.md) defines ownership, retry, format,
+binary compatibility and migration promises. See the
+[graduation inventory](docs/graduation-inventory.md) and release evidence before
+claiming a candidate has completed publication.
 
 ## Design principles
 
@@ -142,29 +146,27 @@ v1 ledger and v2 canonical-JSON vectors in Python, then restores, builds, and vu
 isolated consumer from the packed artifacts before uploading `.nupkg` and
 `.snupkg` files.
 
-Publishing follows the Baize workflow. Configure NuGet trusted publishing for
-this GitHub repository and workflow, then add the NuGet account name as the
-`NUGET_USER` repository secret. Either dispatch **Publish to NuGet** manually or
-push a version tag; a tag such as `v0.1.0-preview.4` becomes package version
-`0.1.0-preview.4`.
-
-```powershell
-git tag v0.1.0-preview.4
-git push origin v0.1.0-preview.4
-```
-
-The API remains pre-release and may change before the first package release.
+Dispatch **Publish qualified Siming graduation packages** from the clean reviewed
+`main` commit whose version is set in Directory.Build.props. The existing NuGet
+trusted publisher and `NUGET_USER` secret remain the authorization mechanism.
+The workflow packs once, verifies identity/source/hash, qualifies the same
+artifacts on all three OSes, publishes those artifacts, then proves fresh
+public packages and unchanged compiled consumers. Stable tags are created only
+after public qualification; tags record provenance and do not republish.
+See [release qualification](docs/release-qualification.md) for exact gates.
 
 ## Current status
 
-The current package line is `0.1.0-preview.6` on .NET 8. The in-memory and
+The graduation candidate is `1.0.0-rc.1` on .NET 8, following the published
+`0.1.0-preview.7` line. The in-memory and
 SQLite ledgers, provider conformance suite, canonical JSON v1 and v2 identities,
 expected-head appends, bounded verification, detached Ed25519 checkpoints,
 context-bound (epoch 2) and keyed `hmac-sha256-v1` (epoch 3) ledger epochs, and
 the verification CLI (checkpoint, signed-checkpoint, context, and HMAC key
 flags) are implemented. Runnable API examples live in `samples/` and run in CI.
-Remaining roadmap work includes expanded platform CI, Native AOT review,
-benchmarks, operational guidance, and Guyabano adoption.
+Graduation freezes these contracts without adding capabilities. Native AOT
+linking and performance work remain deferred. Guyabano, published Hongxian and
+Marang paths are representative consumer probes, not full-application certification.
 
 ## Samples
 

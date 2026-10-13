@@ -607,6 +607,40 @@ public sealed class SqliteAppendOnlyLedgerTests : IDisposable
         Assert.False((await reopened.VerifyAsync()).IsValid);
     }
 
+    [Fact]
+    public async Task Append_SnapshotsBytesBeforeAnAsynchronousCommitBoundary()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var ledger = new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("owned-input.db"), new(), async (point, token) =>
+            {
+                if (point == SqliteAppendFaultPoint.AfterHeadRead)
+                {
+                    entered.TrySetResult();
+                    await release.Task.WaitAsync(token);
+                }
+            });
+        var input = new byte[] { 1, 2, 3 };
+        var append = ledger.AppendAsync(new LedgerAppendRequest("s", "e", input)).AsTask();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        input[0] = 9;
+        release.TrySetResult();
+        var result = await append;
+        Assert.Equal(new byte[] { 1, 2, 3 }, result.Payload.ToArray());
+        Assert.True((await ledger.VerifyAsync()).IsValid);
+    }
+
+    [Fact]
+    public void InvalidOpenModeAndTimeout_AreRejectedBeforeStorage()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("invalid.db") with { OpenMode = (SimingSqliteOpenMode)99 }, new()));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SqliteAppendOnlyLedger<CanonicalJsonPayloadSerializer>(
+            Options("invalid.db") with { BusyTimeout = TimeSpan.Zero }, new()));
+        Assert.False(File.Exists(Path.Combine(root, "invalid.db")));
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

@@ -134,11 +134,11 @@ public static class LedgerProviderConformance
             {
             }
             checks.Add("verification-cancellation");
-            return new(true, checks);
+            return new(true, checks.AsReadOnly());
         }
         catch (Exception exception)
         {
-            return new(false, checks, exception.Message);
+            return new(false, checks.AsReadOnly(), exception.Message);
         }
     }
 

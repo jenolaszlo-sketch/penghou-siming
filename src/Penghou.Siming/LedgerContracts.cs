@@ -74,8 +74,8 @@ public readonly struct LedgerHash : IEquatable<LedgerHash>
         bytes = value.ToArray();
     }
 
-    /// <summary>Gets the hash bytes.</summary>
-    public ReadOnlyMemory<byte> Bytes => bytes ?? new byte[Size];
+    /// <summary>Gets a detached copy of the hash bytes.</summary>
+    public ReadOnlyMemory<byte> Bytes => bytes?.ToArray() ?? new byte[Size];
     /// <inheritdoc />
     public bool Equals(LedgerHash other) => System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(Bytes.Span, other.Bytes.Span);
     /// <inheritdoc />

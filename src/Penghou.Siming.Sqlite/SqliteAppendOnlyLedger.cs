@@ -39,7 +39,12 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
         LedgerHmacKey? hmacKey = null)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(serializer);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.DatabasePath);
+        if (!Enum.IsDefined(options.OpenMode))
+            throw new ArgumentOutOfRangeException(nameof(options), "Unknown SQLite open mode.");
+        if (options.BusyTimeout <= TimeSpan.Zero || options.BusyTimeout > TimeSpan.FromSeconds(int.MaxValue))
+            throw new ArgumentOutOfRangeException(nameof(options), "Busy timeout must be positive and representable in seconds.");
         ArgumentNullException.ThrowIfNull(options.InputLimits);
         options.InputLimits.Validate();
         options.LedgerContext?.Validate();
@@ -127,6 +132,7 @@ public sealed class SqliteAppendOnlyLedger<TSerializer> :
             throw new InvalidOperationException(
                 "Cannot append through a read-only Siming SQLite ledger.");
         options.InputLimits.ValidateAppend(streamId, eventType, payload, idempotencyKey);
+        payload = payload with { Bytes = payload.Bytes.ToArray() };
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);

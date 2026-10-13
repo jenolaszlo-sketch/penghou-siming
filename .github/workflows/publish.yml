@@ -1,69 +1,195 @@
-name: Publish to NuGet
-
+name: Publish qualified Siming graduation packages
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
+  pack:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - id: version
+        shell: pwsh
+        run: |
+          $version = (dotnet msbuild src/Penghou.Siming/Penghou.Siming.csproj -getProperty:Version -nologo).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Version lookup failed' }
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag/version mismatch' }
+          if ($env:GITHUB_REF_TYPE -ne 'tag' -and $env:GITHUB_REF -ne 'refs/heads/main') { throw 'Manual release requires main' }
+          if ((git rev-parse HEAD).Trim() -ne $env:GITHUB_SHA) { throw 'Wrong checkout' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          dotnet pack Penghou.Siming.slnx -c Release -o release-packages -p:ContinuousIntegrationBuild=true
+          if ($LASTEXITCODE -ne 0) { throw 'Pack failed' }
+          ./tools/verify_package_set.ps1 -Version $version -PackageDirectory release-packages -ExpectedCommit $env:GITHUB_SHA
+          if (-not $?) { throw 'Package validation failed' }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: siming-packages-${{ github.sha }}
+          path: release-packages/*
+          if-no-files-found: error
+          retention-days: 30
+  qualify:
+    needs: pack
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/checkout@v6
+        with:
+          repository: jenolaszlo-sketch/guyabano
+          ref: df845087a663b51929c081f7e83b9852598bc995
+          path: .consumer-sources/guyabano
+      - uses: actions/checkout@v6
+        with:
+          repository: jenolaszlo-sketch/marang
+          ref: bca73774386e3ae2a455a00db3ff637ea5c0db6e
+          path: .consumer-sources/marang
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - uses: actions/download-artifact@v7
+        with:
+          name: siming-packages-${{ github.sha }}
+          path: release-packages
+      - shell: pwsh
+        env:
+          VERSION: ${{ needs.pack.outputs.version }}
+        run: |
+          ./tools/verify_package_set.ps1 -Version $env:VERSION -PackageDirectory release-packages -ExpectedCommit $env:GITHUB_SHA
+          if (-not $?) { throw 'Package verification failed' }
+          dotnet format Penghou.Siming.slnx --verify-no-changes
+          if ($LASTEXITCODE -ne 0) { throw 'Format failed' }
+          python tools/verify_golden_vectors.py
+          if ($LASTEXITCODE -ne 0) { throw 'Vectors failed' }
+          $baseline = if ($env:VERSION -eq '1.0.0') { '1.0.0-rc.1' } else { '0.1.0-preview.7' }
+          ./tools/qualify_release.ps1 -Version $env:VERSION -BaselineVersion $baseline -MarangSourceDirectory .consumer-sources/marang -PackageDirectory release-packages -OutputDirectory artifacts/qualification
+          if (-not $?) { throw 'Actual artifact qualification failed' }
+          ./tools/qualify_real_consumers.ps1 -Version $env:VERSION -BaselineVersion $baseline -GuyabanoSourceDirectory .consumer-sources/guyabano -PackageDirectory release-packages -OutputDirectory artifacts/real-consumers
+          if (-not $?) { throw 'Representative consumer qualification failed' }
+          dotnet run --project samples/Penghou.Siming.Samples -c Release --no-build
+          if ($LASTEXITCODE -ne 0) { throw 'Sample failed' }
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: siming-qualification-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            artifacts/qualification/**/qualification.json
+            artifacts/qualification/**/*.trx
+            artifacts/qualification/**/*.log
+            artifacts/real-consumers/**/qualification.json
+            artifacts/real-consumers/**/*.trx
+            artifacts/real-consumers/**/*.log
+          retention-days: 30
   publish:
+    needs: [pack, qualify]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+      - uses: actions/checkout@v6
         with:
-          dotnet-version: 8.0.x
-
-      - name: Pack
-        shell: bash
+          ref: ${{ github.sha }}
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@v7
+        with:
+          name: siming-packages-${{ github.sha }}
+          path: release-packages
+      - shell: pwsh
+        env:
+          VERSION: ${{ needs.pack.outputs.version }}
         run: |
-          version=$(dotnet msbuild src/Penghou.Siming/Penghou.Siming.csproj -getProperty:Version -nologo)
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            version="${GITHUB_REF_NAME#v}"
-          fi
-          echo "PACKAGE_VERSION=$version" >> "$GITHUB_ENV"
-          for csproj in \
-            src/Penghou.Siming/Penghou.Siming.csproj \
-            src/Penghou.Siming.Sqlite/Penghou.Siming.Sqlite.csproj \
-            src/Penghou.Siming.Cryptography/Penghou.Siming.Cryptography.csproj \
-            src/Penghou.Siming.Testing/Penghou.Siming.Testing.csproj \
-            src/Penghou.Siming.Verify/Penghou.Siming.Verify.csproj; do
-            dotnet pack "$csproj" \
-              --configuration Release \
-              --output ./artifacts \
-              --property:PackageVersion="$version"
-          done
-
-      - name: Restore and audit packed consumer
-        shell: pwsh
-        run: ./tools/verify_packed_consumer.ps1 -PackageDirectory artifacts -Version $env:PACKAGE_VERSION
-
-      - name: NuGet login (OIDC -> temp API key)
+          ./tools/verify_package_set.ps1 -Version $env:VERSION -PackageDirectory release-packages -ExpectedCommit $env:GITHUB_SHA
+          if (-not $?) { throw 'Publication artifact verification failed' }
+      - uses: NuGet/login@v1
         id: login
-        uses: NuGet/login@v1
         with:
           user: ${{ secrets.NUGET_USER }}
-
-      - name: Push packages to NuGet
-        run: >
-          dotnet nuget push ./artifacts/*.nupkg
-          --source https://api.nuget.org/v3/index.json
-          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
-          --skip-duplicate
-
-      - name: Push symbols to NuGet
-        run: >
-          dotnet nuget push ./artifacts/*.snupkg
-          --source https://api.nuget.org/v3/index.json
-          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
-          --skip-duplicate
+      - name: Push retained qualified artifacts
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          foreach ($package in Get-ChildItem release-packages/*.nupkg) {
+            dotnet nuget push $package.FullName --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY --no-symbols --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { throw 'Package upload failed' }
+          }
+          foreach ($package in Get-ChildItem release-packages/*.snupkg) {
+            dotnet nuget push $package.FullName --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { throw 'Symbol upload failed' }
+          }
+  public:
+    needs: [pack, publish]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/checkout@v6
+        with:
+          repository: jenolaszlo-sketch/guyabano
+          ref: df845087a663b51929c081f7e83b9852598bc995
+          path: .consumer-sources/guyabano
+      - uses: actions/checkout@v6
+        with:
+          repository: jenolaszlo-sketch/marang
+          ref: bca73774386e3ae2a455a00db3ff637ea5c0db6e
+          path: .consumer-sources/marang
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - uses: actions/download-artifact@v7
+        with:
+          name: siming-packages-${{ github.sha }}
+          path: release-packages
+      - shell: pwsh
+        env:
+          VERSION: ${{ needs.pack.outputs.version }}
+        run: |
+          ./tools/verify_public_packages.ps1 -Version $env:VERSION -PackageDirectory release-packages -OutputDirectory artifacts/public-bytes
+          if (-not $?) { throw 'Public bytes differ' }
+          $baseline = if ($env:VERSION -eq '1.0.0') { '1.0.0-rc.1' } else { '0.1.0-preview.7' }
+          ./tools/qualify_release.ps1 -Version $env:VERSION -BaselineVersion $baseline -MarangSourceDirectory .consumer-sources/marang -PublicPackage -OutputDirectory artifacts/public-qualification
+          if (-not $?) { throw 'Public qualification failed' }
+          ./tools/qualify_real_consumers.ps1 -Version $env:VERSION -BaselineVersion $baseline -GuyabanoSourceDirectory .consumer-sources/guyabano -PublicPackage -OutputDirectory artifacts/public-consumers
+          if (-not $?) { throw 'Public real consumer qualification failed' }
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: siming-public-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            artifacts/public-bytes/*.json
+            artifacts/public-qualification/**/qualification.json
+            artifacts/public-qualification/**/*.trx
+            artifacts/public-qualification/**/*.log
+            artifacts/public-consumers/**/qualification.json
+            artifacts/public-consumers/**/*.trx
+            artifacts/public-consumers/**/*.log
+          retention-days: 30

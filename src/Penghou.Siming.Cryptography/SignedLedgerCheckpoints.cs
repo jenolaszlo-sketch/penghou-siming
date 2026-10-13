@@ -156,6 +156,10 @@ public static class SignedLedgerCheckpoints
             using var document = JsonDocument.Parse(
                 utf8Json.ToArray(), new JsonDocumentOptions { MaxDepth = 16 });
             var root = document.RootElement;
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var property in root.EnumerateObject())
+                if (!names.Add(property.Name))
+                    throw new FormatException("Duplicate signed-checkpoint property names are ambiguous.");
             if (root.GetProperty("documentType").GetString() !=
                     "penghou-siming-signed-checkpoint" ||
                 root.GetProperty("documentVersion").GetInt32() != 1)
@@ -165,6 +169,8 @@ public static class SignedLedgerCheckpoints
                 throw new FormatException(
                     $"The embedded checkpoint is {checkpoint.Length} bytes; the maximum is {LedgerCheckpoints.MaximumDocumentBytes} bytes.");
             var algorithm = root.GetProperty("algorithm").GetString()!;
+            if (string.IsNullOrWhiteSpace(algorithm))
+                throw new FormatException("The signature algorithm cannot be empty.");
             var keyId = RequireKeyId(root.GetProperty("keyId").GetString()!, "keyId");
             return new(
                 algorithm,
@@ -177,7 +183,7 @@ public static class SignedLedgerCheckpoints
             throw;
         }
         catch (Exception exception) when (
-            exception is JsonException or InvalidOperationException or KeyNotFoundException)
+            exception is JsonException or InvalidOperationException or KeyNotFoundException or ArgumentException)
         {
             throw new FormatException("The signed checkpoint document is malformed.", exception);
         }

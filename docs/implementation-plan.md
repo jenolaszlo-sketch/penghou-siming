@@ -427,6 +427,10 @@ measurements demonstrate a real need.
 
 ### Preview compatibility policy
 
+Historical policy for the preview line. Superseded for 1.0 by
+[stable-contract.md](stable-contract.md) and ADR 0001; retained here to explain
+earlier consumer migrations.
+
 Source compatibility is preserved within the preview line, but optional
 parameters and record-shape changes are binary-breaking for already-compiled
 consumers (observed 2026-09-27: packed Hongxian against a new Siming).

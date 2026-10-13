@@ -98,6 +98,13 @@ public static class LedgerCheckpoints
             using var document = JsonDocument.Parse(
                 utf8Json.ToArray(), new JsonDocumentOptions { MaxDepth = 16 });
             var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                var names = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var property in root.EnumerateObject())
+                    if (!names.Add(property.Name))
+                        throw new FormatException("Duplicate checkpoint property names are ambiguous.");
+            }
             if (root.ValueKind != JsonValueKind.Object ||
                 root.GetProperty("documentType").GetString() != "penghou-siming-checkpoint" ||
                 root.GetProperty("documentVersion").GetInt32() != 1)

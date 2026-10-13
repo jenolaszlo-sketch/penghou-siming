@@ -17,6 +17,7 @@ public sealed class LedgerHmacKey : IDisposable
     public const int MaxKeyIdUtf8Bytes = 256;
 
     private readonly byte[] secret;
+    private bool cleared;
 
     /// <summary>Creates a keyed-suite key, copying the secret.</summary>
     public LedgerHmacKey(string keyId, ReadOnlySpan<byte> secret)
@@ -36,12 +37,22 @@ public sealed class LedgerHmacKey : IDisposable
     /// <summary>Gets the caller-assigned key identifier committed by keyed hashes.</summary>
     public string KeyId { get; }
 
-    /// <summary>Gets the secret bytes. The caller must protect and clear its own copies.</summary>
-    public ReadOnlyMemory<byte> Secret => secret;
+    /// <summary>Gets a detached secret copy. The caller must protect and clear its own copies.</summary>
+    public ReadOnlyMemory<byte> Secret => secret.ToArray();
+
+    internal ReadOnlySpan<byte> SecretSpan
+    {
+        get
+        {
+            Validate();
+            return secret;
+        }
+    }
 
     /// <summary>Validates the key identifier and secret size.</summary>
     public void Validate()
     {
+        ObjectDisposedException.ThrowIf(cleared, this);
         if (string.IsNullOrWhiteSpace(KeyId))
             throw new ArgumentException("Key ID cannot be empty.", nameof(KeyId));
         if (Encoding.UTF8.GetByteCount(KeyId) > MaxKeyIdUtf8Bytes)
@@ -52,8 +63,12 @@ public sealed class LedgerHmacKey : IDisposable
                 $"An HMAC suite key must contain exactly {SecretSize} bytes.", nameof(Secret));
     }
 
-    /// <summary>Zeros the stored secret bytes.</summary>
-    public void Clear() => CryptographicOperations.ZeroMemory(secret);
+    /// <summary>Zeros the stored secret bytes and permanently prevents further cryptographic use.</summary>
+    public void Clear()
+    {
+        CryptographicOperations.ZeroMemory(secret);
+        cleared = true;
+    }
 
     /// <inheritdoc />
     public void Dispose() => Clear();

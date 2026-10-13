@@ -32,7 +32,7 @@ public static class LedgerFormatV3
         ArgumentNullException.ThrowIfNull(key);
         key.Validate();
         using var hash = IncrementalHash.CreateHMAC(
-            HashAlgorithmName.SHA256, key.Secret.Span);
+            HashAlgorithmName.SHA256, key.SecretSpan);
         Append(hash, GenesisDomain);
         AppendText(hash, Suite);
         AppendText(hash, key.KeyId);
@@ -52,7 +52,7 @@ public static class LedgerFormatV3
         if (payload.SerializationVersion <= 0) throw new ArgumentOutOfRangeException(nameof(payload.SerializationVersion));
         if (idempotencyKey is not null && string.IsNullOrWhiteSpace(idempotencyKey)) throw new ArgumentException("Idempotency key cannot be empty.", nameof(idempotencyKey));
         using var hash = IncrementalHash.CreateHMAC(
-            HashAlgorithmName.SHA256, key.Secret.Span);
+            HashAlgorithmName.SHA256, key.SecretSpan);
         Append(hash, RowDomain);
         AppendText(hash, Suite);
         AppendText(hash, key.KeyId);

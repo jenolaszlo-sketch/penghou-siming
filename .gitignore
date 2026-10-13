@@ -4,6 +4,7 @@ obj/
 .idea/
 TestResults/
 artifacts/
+.consumer-sources/
 BenchmarkDotNet.Artifacts/
 *.user
 *.suo
