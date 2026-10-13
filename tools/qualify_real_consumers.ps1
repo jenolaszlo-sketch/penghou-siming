@@ -82,7 +82,7 @@ foreach ($relative in @('tests/Guyabano.Session.Tests/bin/Release/net10.0','hong
     $records.Add([ordered]@{ Probe='unchanged-consumer-binary'; CompiledAgainst=$BaselineVersion; RunsAgainst=$Version; ConsumerHashes=$before; Result='SUPPORTED BY THIS PROBE' })
 }
 [ordered]@{
-    Repository='https://github.com/jenolaszlo-sketch/penghou-siming'; Commit=(git -C $repo rev-parse HEAD); Branch=(git -C $repo branch --show-current);
+    Repository='https://github.com/jenolaszlo-sketch/penghou-siming'; Commit=(git -C $repo rev-parse HEAD); Branch=$(if ($env:GITHUB_REF) { $env:GITHUB_REF } else { git -C $repo branch --show-current });
     WorkingTreeStatus=@(git -C $repo status --porcelain); QualifiedAt=[DateTimeOffset]::UtcNow.ToString('O'); OS=[Runtime.InteropServices.RuntimeInformation]::OSDescription;
     Framework='net10.0'; Version=$Version; BaselineVersion=$BaselineVersion; PublicPackage=[bool]$PublicPackage; Results=$records.ToArray();
     Limits='Only original Guyabano session/checkpoint tests and published Hongxian session-store path. No full application or downstream graduation claim. Source modification is limited to isolated package references; original checkouts untouched.'

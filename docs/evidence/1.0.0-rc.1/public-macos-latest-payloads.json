@@ -1,0 +1,42 @@
+[
+  {
+    "Package": "Penghou.Siming",
+    "Version": "1.0.0-rc.1",
+    "PublicSHA256": "4866663FD0F09C069FD5D47824EA21F486E49ABBBD08754181F680FCB6850142",
+    "QualifiedSHA256": "CF1A76E568DA3CA111C8F0754E91A5E9E4848BDB2A7E4C48EDE63F1A39DDD164",
+    "ExcludedEntry": ".signature.p7s only",
+    "Result": "SUPPORTED BY THIS PROBE: public package payload identical to qualified artifact"
+  },
+  {
+    "Package": "Penghou.Siming.Sqlite",
+    "Version": "1.0.0-rc.1",
+    "PublicSHA256": "37BE4197B46ED45DE2C35C8E857B0FA2EFBF4F7B43A085C676E365E2F4CF4AA8",
+    "QualifiedSHA256": "5C55FE338ADBE1D7EF495EB236CA4340E831763D0580AC7A74524BDB977C9A6A",
+    "ExcludedEntry": ".signature.p7s only",
+    "Result": "SUPPORTED BY THIS PROBE: public package payload identical to qualified artifact"
+  },
+  {
+    "Package": "Penghou.Siming.Cryptography",
+    "Version": "1.0.0-rc.1",
+    "PublicSHA256": "AC825A5DE6377ABB5D63E104FD75F5DF50F66BD18448AF88B843A8D769F1FA6A",
+    "QualifiedSHA256": "CF95AB1179E4F8A13E4DD4D59280DEEBE4859EABC6689B578D61FE2F9FF2B95D",
+    "ExcludedEntry": ".signature.p7s only",
+    "Result": "SUPPORTED BY THIS PROBE: public package payload identical to qualified artifact"
+  },
+  {
+    "Package": "Penghou.Siming.Testing",
+    "Version": "1.0.0-rc.1",
+    "PublicSHA256": "A6525D71C8A8CC97E7317102334A660E6ACF7AAF8F6E03A907A7228B36927FDC",
+    "QualifiedSHA256": "21D8C27A1ADC03B824D791E1B330296BE9FD507F983EA5D7C9584E0E7B520C76",
+    "ExcludedEntry": ".signature.p7s only",
+    "Result": "SUPPORTED BY THIS PROBE: public package payload identical to qualified artifact"
+  },
+  {
+    "Package": "Penghou.Siming.Verify",
+    "Version": "1.0.0-rc.1",
+    "PublicSHA256": "41E84B9D8403BACE90F92FB79A88BBB20EE686D2B426A42BD6B0F48C0C484BFB",
+    "QualifiedSHA256": "3E0226D322C46440B00E52E4501CC2F95696B2C7CDA9989D82B36AC2DEF9BDA6",
+    "ExcludedEntry": ".signature.p7s only",
+    "Result": "SUPPORTED BY THIS PROBE: public package payload identical to qualified artifact"
+  }
+]

@@ -25,6 +25,8 @@ jobs:
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag/version mismatch' }
           if ($env:GITHUB_REF_TYPE -ne 'tag' -and $env:GITHUB_REF -ne 'refs/heads/main') { throw 'Manual release requires main' }
           if ((git rev-parse HEAD).Trim() -ne $env:GITHUB_SHA) { throw 'Wrong checkout' }
+          $sourceStatus = @(git status --porcelain)
+          if ($LASTEXITCODE -ne 0 -or $sourceStatus.Count) { throw 'Release source must be clean before packing' }
           "version=$version" >> $env:GITHUB_OUTPUT
           dotnet pack Penghou.Siming.slnx -c Release -o release-packages -p:ContinuousIntegrationBuild=true
           if ($LASTEXITCODE -ne 0) { throw 'Pack failed' }

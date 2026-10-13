@@ -1,0 +1,72 @@
+[
+  {
+    "Package": "Penghou.Siming",
+    "Version": "1.0.0-rc.1",
+    "Archive": "nupkg",
+    "SourceCommit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+    "SHA256": "CF1A76E568DA3CA111C8F0754E91A5E9E4848BDB2A7E4C48EDE63F1A39DDD164"
+  },
+  {
+    "Package": "Penghou.Siming",
+    "Version": "1.0.0-rc.1",
+    "Archive": "snupkg",
+    "SourceCommit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+    "SHA256": "439B6B6286482A3C98C0ED6C21D0FD70F656DC44790084C5DA318628E089445D"
+  },
+  {
+    "Package": "Penghou.Siming.Sqlite",
+    "Version": "1.0.0-rc.1",
+    "Archive": "nupkg",
+    "SourceCommit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+    "SHA256": "5C55FE338ADBE1D7EF495EB236CA4340E831763D0580AC7A74524BDB977C9A6A"
+  },
+  {
+    "Package": "Penghou.Siming.Sqlite",
+    "Version": "1.0.0-rc.1",
+    "Archive": "snupkg",
+    "SourceCommit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+    "SHA256": "EB823F96DCDEB165ECF17CF2BC7FAF9583F6835B4925C3B55DAC1250E642C1D0"
+  },
+  {
+    "Package": "Penghou.Siming.Cryptography",
+    "Version": "1.0.0-rc.1",
+    "Archive": "nupkg",
+    "SourceCommit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+    "SHA256": "CF95AB1179E4F8A13E4DD4D59280DEEBE4859EABC6689B578D61FE2F9FF2B95D"
+  },
+  {
+    "Package": "Penghou.Siming.Cryptography",
+    "Version": "1.0.0-rc.1",
+    "Archive": "snupkg",
+    "SourceCommit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+    "SHA256": "6D72EA47F8BFAF4F55D458FFAF2CD2AA432C11B096AD72D52D8BFC005E7F05E2"
+  },
+  {
+    "Package": "Penghou.Siming.Testing",
+    "Version": "1.0.0-rc.1",
+    "Archive": "nupkg",
+    "SourceCommit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+    "SHA256": "21D8C27A1ADC03B824D791E1B330296BE9FD507F983EA5D7C9584E0E7B520C76"
+  },
+  {
+    "Package": "Penghou.Siming.Testing",
+    "Version": "1.0.0-rc.1",
+    "Archive": "snupkg",
+    "SourceCommit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+    "SHA256": "751E3099BBB3A3AB3654B74B3417D98F56F0D4C392DF3078AE5AAFAADA8BAB4B"
+  },
+  {
+    "Package": "Penghou.Siming.Verify",
+    "Version": "1.0.0-rc.1",
+    "Archive": "nupkg",
+    "SourceCommit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+    "SHA256": "3E0226D322C46440B00E52E4501CC2F95696B2C7CDA9989D82B36AC2DEF9BDA6"
+  },
+  {
+    "Package": "Penghou.Siming.Verify",
+    "Version": "1.0.0-rc.1",
+    "Archive": "snupkg",
+    "SourceCommit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+    "SHA256": "9528E46ECFDA35CF987ED14CC56F7878944B354D63C6C73B9E2D2B4715F68FFC"
+  }
+]

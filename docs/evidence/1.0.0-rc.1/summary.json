@@ -1,0 +1,21 @@
+{
+  "Repository": "https://github.com/jenolaszlo-sketch/penghou-siming",
+  "SourceCommit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+  "Version": "1.0.0-rc.1",
+  "ReleaseRun": "https://github.com/jenolaszlo-sketch/penghou-siming/actions/runs/38440807915/attempts/2",
+  "Status": "All artifact and fresh public gates passed",
+  "Platforms": [
+    "Windows",
+    "Linux",
+    "macOS"
+  ],
+  "ProductFramework": "net8.0",
+  "RealConsumerFramework": "net10.0",
+  "ContractCases": 108,
+  "GuyabanoCases": 14,
+  "PackagePayloadComparison": "All five package entry names/bytes match, excluding only repository signature",
+  "BinaryBaseline": "0.1.0-preview.7",
+  "Scope": "Foundation+unchanged compiled consumer with retained database, original Guyabano tests and unchanged adapter/test DLLs, published Hongxian.Sqlite preview.5, actual Marang fingerprint source",
+  "FirstAttempt": "Public availability timeout; no package replacement or bypass",
+  "RecordedAt": "2026-10-13T23:28:35.6375005+00:00"
+}

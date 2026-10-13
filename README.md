@@ -157,8 +157,10 @@ See [release qualification](docs/release-qualification.md) for exact gates.
 
 ## Current status
 
-The graduation candidate is `1.0.0-rc.1` on .NET 8, following the published
-`0.1.0-preview.7` line. The in-memory and
+The release target is `1.0.0` on .NET 8, following the qualified public
+`1.0.0-rc.1` and `0.1.0-preview.7` line. The
+[release notes](docs/releases/1.0.0.md) and qualification evidence record final
+publication status. The in-memory and
 SQLite ledgers, provider conformance suite, canonical JSON v1 and v2 identities,
 expected-head appends, bounded verification, detached Ed25519 checkpoints,
 context-bound (epoch 2) and keyed `hmac-sha256-v1` (epoch 3) ledger epochs, and

@@ -1,0 +1,63 @@
+{
+  "Repository": "https://github.com/jenolaszlo-sketch/penghou-siming",
+  "Branch": null,
+  "Commit": "38f1ad7069dcfa952c2be39cb3e035e1b1d17efc",
+  "WorkingTreeStatus": [
+    "?? release-packages/"
+  ],
+  "QualifiedAt": "2026-10-13T23:25:14.6596161+00:00",
+  "OS": "Microsoft Windows 10.0.26100",
+  "Framework": "net8.0",
+  "PackageVersion": "1.0.0-rc.1",
+  "BaselineVersion": "0.1.0-preview.7",
+  "PublicPackage": true,
+  "Artifacts": [
+    {
+      "Package": "Penghou.Siming",
+      "Version": "1.0.0-rc.1",
+      "SHA256": "4866663FD0F09C069FD5D47824EA21F486E49ABBBD08754181F680FCB6850142"
+    },
+    {
+      "Package": "Penghou.Siming.Sqlite",
+      "Version": "1.0.0-rc.1",
+      "SHA256": "37BE4197B46ED45DE2C35C8E857B0FA2EFBF4F7B43A085C676E365E2F4CF4AA8"
+    },
+    {
+      "Package": "Penghou.Siming.Cryptography",
+      "Version": "1.0.0-rc.1",
+      "SHA256": "AC825A5DE6377ABB5D63E104FD75F5DF50F66BD18448AF88B843A8D769F1FA6A"
+    },
+    {
+      "Package": "Penghou.Siming.Testing",
+      "Version": "1.0.0-rc.1",
+      "SHA256": "A6525D71C8A8CC97E7317102334A660E6ACF7AAF8F6E03A907A7228B36927FDC"
+    }
+  ],
+  "Results": [
+    {
+      "Probe": "compiled-package-behavior",
+      "CompiledAgainst": "0.1.0-preview.7",
+      "Result": "SUPPORTED BY THIS PROBE"
+    },
+    {
+      "Probe": "compiled-package-behavior",
+      "CompiledAgainst": "1.0.0-rc.1",
+      "Result": "SUPPORTED BY THIS PROBE"
+    },
+    {
+      "Probe": "unchanged-binary-and-existing-database",
+      "CompiledAgainst": "0.1.0-preview.7",
+      "RunsAgainst": "1.0.0-rc.1",
+      "ConsumerSHA256": "49F40D00D21E199F8D76318EF3843F5A5D5F3BA7AFA0BB337FB23033E6A61A41",
+      "Result": "SUPPORTED BY THIS PROBE"
+    },
+    {
+      "Probe": "exact-packaged-libraries-contract-suite-and-verifier",
+      "Result": "SUPPORTED BY THIS PROBE"
+    }
+  ],
+  "MarangSourceCommit": "bca73774386e3ae2a455a00db3ff637ea5c0db6e",
+  "MarangSourceSHA256": "21FC4925F98319B83B62B5E445BF44EEFC412219224D678445BC4C2CA3E7F7D8",
+  "Commands": "restore fresh package cache; build isolated package consumer; run behavior; replace product DLLs without rebuilding consumer; reopen old database; exact package contract suite; install/run verifier",
+  "Limits": "Standalone foundation contracts and existing consumer-shaped paths. Real Guyabano/Hongxian/Marang adapters are separately qualified. No full-application or new framework certification."
+}

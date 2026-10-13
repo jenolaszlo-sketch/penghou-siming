@@ -4,6 +4,7 @@ obj/
 .idea/
 TestResults/
 artifacts/
+release-packages/
 .consumer-sources/
 BenchmarkDotNet.Artifacts/
 *.user

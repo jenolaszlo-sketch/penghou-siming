@@ -91,7 +91,7 @@ foreach ($id in @($ids + 'Penghou.Siming.Verify')) {
     if (Test-Path -LiteralPath $package) { $artifactRecords += [ordered]@{ Package=$id; Version=$Version; SHA256=(Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash } }
 }
 [ordered]@{
-    Repository='https://github.com/jenolaszlo-sketch/penghou-siming'; Branch=(git -C $repo branch --show-current); Commit=(git -C $repo rev-parse HEAD);
+    Repository='https://github.com/jenolaszlo-sketch/penghou-siming'; Branch=$(if ($env:GITHUB_REF) { $env:GITHUB_REF } else { git -C $repo branch --show-current }); Commit=(git -C $repo rev-parse HEAD);
     WorkingTreeStatus=@(git -C $repo status --porcelain); QualifiedAt=[DateTimeOffset]::UtcNow.ToString('O'); OS=[Runtime.InteropServices.RuntimeInformation]::OSDescription;
     Framework='net8.0'; PackageVersion=$Version; BaselineVersion=$BaselineVersion; PublicPackage=[bool]$PublicPackage; Artifacts=$artifactRecords; Results=$results.ToArray();
     MarangSourceCommit='bca73774386e3ae2a455a00db3ff637ea5c0db6e'; MarangSourceSHA256=(Get-FileHash -LiteralPath $marangSource -Algorithm SHA256).Hash;
