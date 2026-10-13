@@ -1,0 +1,172 @@
+name: Requalify retained public Siming 1.0 artifacts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  public:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      RELEASE_RUN: '38485011888'
+      RELEASE_SOURCE: e1c116df26e83f2944cf521909494e603aa282b7
+      RELEASE_VERSION: 1.0.0
+      BASELINE_VERSION: 1.0.0-rc.1
+    steps:
+      - name: Checkout the exact previously published source
+        uses: actions/checkout@v6
+        with:
+          ref: e1c116df26e83f2944cf521909494e603aa282b7
+      - name: Require the original qualified release lineage
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_EVENT_NAME -ne 'workflow_dispatch' -or $env:GITHUB_REF -ne 'refs/heads/main') { throw 'Manual requalification requires main' }
+          if ($env:GITHUB_REPOSITORY -ne 'jenolaszlo-sketch/penghou-siming') { throw 'Unexpected repository' }
+          if ((git rev-parse HEAD).Trim() -ne $env:RELEASE_SOURCE) { throw 'Incorrect release checkout' }
+          $sourceStatus = @(git status --porcelain)
+          if ($LASTEXITCODE -ne 0 -or $sourceStatus.Count) { throw 'Release source must be clean' }
+          $runJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:RELEASE_RUN"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read original release run' }
+          $release = $runJson | ConvertFrom-Json
+          if ($release.head_sha -ne $env:RELEASE_SOURCE -or $release.path -ne '.github/workflows/publish.yml' -or $release.event -ne 'workflow_dispatch' -or $release.head_branch -ne 'main') { throw 'Original run/source/publisher mismatch' }
+          $jobsJson = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:RELEASE_RUN/jobs?per_page=100"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read original release gates' }
+          $jobs = ($jobsJson | ConvertFrom-Json).jobs
+          foreach ($name in @('pack', 'publish')) {
+            $matchingJobs = @($jobs | Where-Object { $_.name -eq $name -and $_.conclusion -eq 'success' })
+            if ($matchingJobs.Count -ne 1) { throw "Original $name gate did not succeed" }
+          }
+          $qualifications = @($jobs | Where-Object { $_.name -like 'qualify (*)' })
+          if ($qualifications.Count -ne 3 -or @($qualifications | Where-Object { $_.conclusion -ne 'success' }).Count) { throw 'Original three-OS exact artifact qualification did not succeed' }
+      - name: Checkout pinned Guyabano consumer
+        uses: actions/checkout@v6
+        with:
+          repository: jenolaszlo-sketch/guyabano
+          ref: df845087a663b51929c081f7e83b9852598bc995
+          path: .consumer-sources/guyabano
+      - name: Checkout pinned Marang consumer
+        uses: actions/checkout@v6
+        with:
+          repository: jenolaszlo-sketch/marang
+          ref: bca73774386e3ae2a455a00db3ff637ea5c0db6e
+          path: .consumer-sources/marang
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Download the original retained artifacts without repacking
+        uses: actions/download-artifact@v7
+        with:
+          name: siming-packages-e1c116df26e83f2944cf521909494e603aa282b7
+          path: artifacts/retained-release
+          run-id: 38485011888
+          github-token: ${{ github.token }}
+      - name: Verify exact retained source and package identities
+        shell: pwsh
+        run: |
+          $version = (dotnet msbuild src/Penghou.Siming/Penghou.Siming.csproj -getProperty:Version -nologo).Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -ne $env:RELEASE_VERSION) { throw 'Release version mismatch' }
+          $originalHashes = @(Get-Content artifacts/retained-release/package-evidence.json -Raw | ConvertFrom-Json)
+          if ($originalHashes.Count -ne 10) { throw 'Original qualified package hash manifest is incomplete' }
+          foreach ($record in $originalHashes) {
+            if ($record.SourceCommit -ne $env:RELEASE_SOURCE -or $record.Version -ne $env:RELEASE_VERSION) { throw 'Original hash manifest/source mismatch' }
+            $archive = Join-Path artifacts/retained-release "$($record.Package).$($record.Version).$($record.Archive)"
+            if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $record.SHA256) { throw 'Retained archive differs from the original qualified hash' }
+          }
+          ./tools/verify_package_set.ps1 -Version $env:RELEASE_VERSION -PackageDirectory artifacts/retained-release -ExpectedCommit $env:RELEASE_SOURCE
+          if (-not $?) { throw 'Retained artifact identity/source/hash verification failed' }
+      - name: Wait only for public package and tool availability
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ids = @('penghou.siming', 'penghou.siming.sqlite', 'penghou.siming.cryptography', 'penghou.siming.testing', 'penghou.siming.verify')
+          # Only 404 availability lag is retried; authentication, transport and content errors fail.
+          $deadline = [DateTimeOffset]::UtcNow.AddMinutes(5)
+          foreach ($id in $ids) {
+            while ($true) {
+              try {
+                Invoke-WebRequest -Method Head -Uri "https://api.nuget.org/v3-flatcontainer/$id/$env:RELEASE_VERSION/$id.$env:RELEASE_VERSION.nupkg" | Out-Null
+                break
+              } catch {
+                if ($null -eq $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 404 -or [DateTimeOffset]::UtcNow -ge $deadline) { throw }
+                Start-Sleep -Seconds 15
+              }
+            }
+          }
+          # dotnet-tool registration can lag flat-container availability. This independent
+          # preflight never retries a behavior/test/payload failure from the qualification suite.
+          $previousPackages = $env:NUGET_PACKAGES
+          $installed = $false
+          try {
+            for ($attempt = 1; $attempt -le 20; $attempt++) {
+              $probe = Join-Path $env:RUNNER_TEMP "siming-tool-availability-$([Guid]::NewGuid().ToString('N'))"
+              New-Item -ItemType Directory -Path $probe | Out-Null
+              $env:NUGET_PACKAGES = Join-Path $probe 'packages'
+              $config = Join-Path $probe 'NuGet.Config'
+              '<configuration><packageSources><clear /><add key="nuget" value="https://api.nuget.org/v3/index.json" /></packageSources><fallbackPackageFolders><clear /></fallbackPackageFolders></configuration>' | Set-Content $config
+              $output = & dotnet tool install Penghou.Siming.Verify --version $env:RELEASE_VERSION --tool-path (Join-Path $probe 'tool') --configfile $config --no-cache 2>&1
+              $exit = $LASTEXITCODE
+              $output | ForEach-Object { Write-Host $_ }
+              if ($exit -eq 0) { $installed = $true; break }
+              $missingVersion = '(?i)Version\s+' + [Regex]::Escape($env:RELEASE_VERSION) + '\s+of package\s+penghou\.siming\.verify\s+is not found'
+              if (($output -join "`n") -notmatch $missingVersion -or $attempt -eq 20) { throw 'Public verifier install failed; not a retryable version-registration delay' }
+              Start-Sleep -Seconds 15
+            }
+          } finally {
+            if ($null -eq $previousPackages) { Remove-Item Env:NUGET_PACKAGES -ErrorAction SilentlyContinue } else { $env:NUGET_PACKAGES = $previousPackages }
+          }
+          if (-not $installed) { throw 'Public verifier availability was not proven' }
+      - name: Compare public bytes and run full existing public compatibility gates once
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Availability is already proven. Every mismatch or suite failure fails immediately.
+          ./tools/verify_public_packages.ps1 -Version $env:RELEASE_VERSION -PackageDirectory artifacts/retained-release -OutputDirectory artifacts/public-bytes -TimeoutSeconds 0
+          if (-not $?) { throw 'Public payloads differ from the original qualified artifacts' }
+          ./tools/qualify_release.ps1 -Version $env:RELEASE_VERSION -BaselineVersion $env:BASELINE_VERSION -MarangSourceDirectory .consumer-sources/marang -PublicPackage -OutputDirectory artifacts/public-qualification
+          if (-not $?) { throw 'Public neutral/exact-contract/unchanged-RC binary qualification failed' }
+          ./tools/qualify_real_consumers.ps1 -Version $env:RELEASE_VERSION -BaselineVersion $env:BASELINE_VERSION -GuyabanoSourceDirectory .consumer-sources/guyabano -PublicPackage -OutputDirectory artifacts/public-consumers
+          if (-not $?) { throw 'Public Guyabano/Hongxian consumer qualification failed' }
+          [ordered]@{
+            SchemaVersion = 1
+            Repository = $env:GITHUB_REPOSITORY
+            ReleaseRun = $env:RELEASE_RUN
+            ReleaseSource = $env:RELEASE_SOURCE
+            Version = $env:RELEASE_VERSION
+            BaselineVersion = $env:BASELINE_VERSION
+            RequalificationRun = $env:GITHUB_RUN_ID
+            RequalificationAttempt = $env:GITHUB_RUN_ATTEMPT
+            ControllerSource = $env:GITHUB_SHA
+            QualifiedAt = [DateTimeOffset]::UtcNow.ToString('O')
+            OS = [Runtime.InteropServices.RuntimeInformation]::OSDescription
+            Result = 'SUPPORTED BY THESE PROBES: exact original artifacts, public payloads, full existing package/consumer/unchanged-RC gates'
+            Limits = 'No repack, publication, API/product/version change or production-host certification. Earlier failed release-run evidence remains intact.'
+          } | ConvertTo-Json -Depth 5 | Set-Content artifacts/public-requalification.json
+      - name: Retain distinct evidence without overwriting earlier failed uploads
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: siming-public-requalification-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/retained-release/package-evidence.json
+            artifacts/public-requalification.json
+            artifacts/public-bytes/*.json
+            artifacts/public-qualification/**/qualification.json
+            artifacts/public-qualification/**/*.trx
+            artifacts/public-qualification/**/*.log
+            artifacts/public-consumers/**/qualification.json
+            artifacts/public-consumers/**/*.trx
+            artifacts/public-consumers/**/*.log
+          retention-days: 30
