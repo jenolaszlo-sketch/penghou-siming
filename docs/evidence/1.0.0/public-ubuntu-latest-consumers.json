@@ -1,0 +1,53 @@
+{
+  "Repository": "https://github.com/jenolaszlo-sketch/penghou-siming",
+  "Commit": "e1c116df26e83f2944cf521909494e603aa282b7",
+  "Branch": "refs/heads/main",
+  "WorkingTreeStatus": [],
+  "QualifiedAt": "2026-10-13T23:59:16.8013750+00:00",
+  "OS": "Ubuntu 24.04.5 LTS",
+  "Framework": "net10.0",
+  "Version": "1.0.0",
+  "BaselineVersion": "1.0.0-rc.1",
+  "PublicPackage": true,
+  "Results": [
+    {
+      "Probe": "actual-consumer-source",
+      "CompiledAgainst": "1.0.0-rc.1",
+      "GuyabanoCommit": "df845087a663b51929c081f7e83b9852598bc995",
+      "GuyabanoFilter": "FullyQualifiedName~SimingSessionEventStoreTests|FullyQualifiedName~SessionCheckpointAnchoringTests",
+      "HongxianVersion": "0.1.0-preview.5",
+      "Result": "SUPPORTED BY THIS PROBE"
+    },
+    {
+      "Probe": "actual-consumer-source",
+      "CompiledAgainst": "1.0.0",
+      "GuyabanoCommit": "df845087a663b51929c081f7e83b9852598bc995",
+      "GuyabanoFilter": "FullyQualifiedName~SimingSessionEventStoreTests|FullyQualifiedName~SessionCheckpointAnchoringTests",
+      "HongxianVersion": "0.1.0-preview.5",
+      "Result": "SUPPORTED BY THIS PROBE"
+    },
+    {
+      "Probe": "unchanged-consumer-binary",
+      "CompiledAgainst": "1.0.0-rc.1",
+      "RunsAgainst": "1.0.0",
+      "ConsumerHashes": {
+        "Guyabano.Session.dll": "4B88AE8880800F3B3D28AF43FE9D23889ACBBA399A702DE8B8E8D71FC9BFD1D0",
+        "Guyabano.Session.Tests.dll": "D95B6EA92E8DF82DE685AB40847D6FEE0F6D0B259D63D07021FA6463EC9283C3",
+        "Guyabano.Session.Sqlite.dll": "D14507C2C7B7FF866559AEAC75A0A941227F15CF42D2858E5B8D3EC130F0B7CE"
+      },
+      "Result": "SUPPORTED BY THIS PROBE"
+    },
+    {
+      "Probe": "unchanged-consumer-binary",
+      "CompiledAgainst": "1.0.0-rc.1",
+      "RunsAgainst": "1.0.0",
+      "ConsumerHashes": {
+        "Penghou.Hongxian.Sqlite.dll": "099FACA0281AE0DA1825EEBC3E3A88B2B1F21EF6FA6AB66205853FB08EBA519E",
+        "Consumer.dll": "55EBB25144D3B0B842AED0738091D8113A42877912BB298CFBB2F9DF827495C2",
+        "Penghou.Hongxian.dll": "849AE117F92E9F5111FE072FA597899E1712FCA0E6AB881B4C3942E9ABC67CDB"
+      },
+      "Result": "SUPPORTED BY THIS PROBE"
+    }
+  ],
+  "Limits": "Only original Guyabano session/checkpoint tests and published Hongxian session-store path. No full application or downstream graduation claim. Source modification is limited to isolated package references; original checkouts untouched."
+}

@@ -1,0 +1,22 @@
+{
+  "Repository": "https://github.com/jenolaszlo-sketch/penghou-siming",
+  "SourceCommit": "e1c116df26e83f2944cf521909494e603aa282b7",
+  "Version": "1.0.0",
+  "Tag": "v1.0.0",
+  "PublicationRun": "https://github.com/jenolaszlo-sketch/penghou-siming/actions/runs/38485011888",
+  "PublicRequalificationRun": "https://github.com/jenolaszlo-sketch/penghou-siming/actions/runs/38487368097",
+  "Status": "Published, indexed and qualified on all required platforms",
+  "Platforms": [
+    "Windows",
+    "Linux",
+    "macOS"
+  ],
+  "ProductFramework": "net8.0",
+  "RealConsumerFramework": "net10.0",
+  "ContractCases": 108,
+  "GuyabanoCases": 14,
+  "BinaryBaseline": "1.0.0-rc.1",
+  "PackagePayloadComparison": "All five public archives match qualified entry names/bytes; only repository signature excluded",
+  "OriginalPublicFailure": "Ubuntu/Windows verifier registration delay; macOS succeeded. Original artifacts and failed evidence preserved; supplemental run performs no repack/publication and all full public gates pass.",
+  "RecordedAt": "2026-10-14T00:04:22.9791973+00:00"
+}

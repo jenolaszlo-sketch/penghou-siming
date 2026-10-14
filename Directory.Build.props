@@ -11,7 +11,7 @@
     <NoWarn>$(NoWarn);RS0026;RS0027</NoWarn>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion Condition="'$(MSBuildProjectName)' != 'Penghou.Siming.Verify'">1.0.0-rc.1</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(MSBuildProjectName)' != 'Penghou.Siming.Verify'">1.0.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <PropertyGroup>

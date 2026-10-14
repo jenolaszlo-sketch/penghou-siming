@@ -1,0 +1,61 @@
+{
+  "Repository": "https://github.com/jenolaszlo-sketch/penghou-siming",
+  "Branch": "refs/heads/main",
+  "Commit": "e1c116df26e83f2944cf521909494e603aa282b7",
+  "WorkingTreeStatus": [],
+  "QualifiedAt": "2026-10-13T23:58:51.3265077+00:00",
+  "OS": "Ubuntu 24.04.5 LTS",
+  "Framework": "net8.0",
+  "PackageVersion": "1.0.0",
+  "BaselineVersion": "1.0.0-rc.1",
+  "PublicPackage": true,
+  "Artifacts": [
+    {
+      "Package": "Penghou.Siming",
+      "Version": "1.0.0",
+      "SHA256": "B144EDE4C09AF971CB7253B4715605CDA4765624B6BC85AD8A1343B8E7105BC6"
+    },
+    {
+      "Package": "Penghou.Siming.Sqlite",
+      "Version": "1.0.0",
+      "SHA256": "C75279F04B9100AA35B26D7D895E916D0CBBC5DE56AAE125132BC8A2ABCB0CDD"
+    },
+    {
+      "Package": "Penghou.Siming.Cryptography",
+      "Version": "1.0.0",
+      "SHA256": "28684F62760D0F1D0EA987E3F7752A0B45F5991B3B7B3F6BAD53EBC402CE91D0"
+    },
+    {
+      "Package": "Penghou.Siming.Testing",
+      "Version": "1.0.0",
+      "SHA256": "586F8705691C81A6F6576D24A6C9E368BDD02F49B83657F4393755852A9AF24C"
+    }
+  ],
+  "Results": [
+    {
+      "Probe": "compiled-package-behavior",
+      "CompiledAgainst": "1.0.0-rc.1",
+      "Result": "SUPPORTED BY THIS PROBE"
+    },
+    {
+      "Probe": "compiled-package-behavior",
+      "CompiledAgainst": "1.0.0",
+      "Result": "SUPPORTED BY THIS PROBE"
+    },
+    {
+      "Probe": "unchanged-binary-and-existing-database",
+      "CompiledAgainst": "1.0.0-rc.1",
+      "RunsAgainst": "1.0.0",
+      "ConsumerSHA256": "EF7A1412755E753CEAFF8D80AAAA78D328727509755179A727FEC81ACFC0F0E4",
+      "Result": "SUPPORTED BY THIS PROBE"
+    },
+    {
+      "Probe": "exact-packaged-libraries-contract-suite-and-verifier",
+      "Result": "SUPPORTED BY THIS PROBE"
+    }
+  ],
+  "MarangSourceCommit": "bca73774386e3ae2a455a00db3ff637ea5c0db6e",
+  "MarangSourceSHA256": "21FC4925F98319B83B62B5E445BF44EEFC412219224D678445BC4C2CA3E7F7D8",
+  "Commands": "restore fresh package cache; build isolated package consumer; run behavior; replace product DLLs without rebuilding consumer; reopen old database; exact package contract suite; install/run verifier",
+  "Limits": "Standalone foundation contracts and existing consumer-shaped paths. Real Guyabano/Hongxian/Marang adapters are separately qualified. No full-application or new framework certification."
+}

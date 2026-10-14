@@ -130,9 +130,9 @@ read snapshot while writers may continue under WAL.
 ## Install
 
 ```powershell
-dotnet add package Penghou.Siming --prerelease
-dotnet add package Penghou.Siming.Sqlite --prerelease
-dotnet tool install --global Penghou.Siming.Verify --prerelease
+dotnet add package Penghou.Siming --version 1.0.0
+dotnet add package Penghou.Siming.Sqlite --version 1.0.0
+dotnet tool install --global Penghou.Siming.Verify --version 1.0.0
 ```
 
 Add `Penghou.Siming.Cryptography` only when detached Ed25519 checkpoint signing
@@ -157,7 +157,7 @@ See [release qualification](docs/release-qualification.md) for exact gates.
 
 ## Current status
 
-The release target is `1.0.0` on .NET 8, following the qualified public
+The published stable family is `1.0.0` on .NET 8, following the qualified public
 `1.0.0-rc.1` and `0.1.0-preview.7` line. The
 [release notes](docs/releases/1.0.0.md) and qualification evidence record final
 publication status. The in-memory and

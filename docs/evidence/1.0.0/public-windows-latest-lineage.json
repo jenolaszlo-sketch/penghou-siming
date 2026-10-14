@@ -1,0 +1,15 @@
+{
+  "SchemaVersion": 1,
+  "Repository": "jenolaszlo-sketch/penghou-siming",
+  "ReleaseRun": "38485011888",
+  "ReleaseSource": "e1c116df26e83f2944cf521909494e603aa282b7",
+  "Version": "1.0.0",
+  "BaselineVersion": "1.0.0-rc.1",
+  "RequalificationRun": "38487368097",
+  "RequalificationAttempt": "1",
+  "ControllerSource": "995bac25d77f8159a4ff3eef98de31fe72a4557e",
+  "QualifiedAt": "2026-10-14T00:01:50.6635888+00:00",
+  "OS": "Microsoft Windows 10.0.26100",
+  "Result": "SUPPORTED BY THESE PROBES: exact original artifacts, public payloads, full existing package/consumer/unchanged-RC gates",
+  "Limits": "No repack, publication, API/product/version change or production-host certification. Earlier failed release-run evidence remains intact."
+}
